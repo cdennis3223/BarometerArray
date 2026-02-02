@@ -29,39 +29,58 @@ static void gps_uart_init(void)
     uart_set_pin(GPS_UART, GPS_TX_PIN, GPS_RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 }
 
-static void gps_task(void *arg){
+void gps_factory_reset()
+{
+    const char *reset_cmd = "$PMTK104*37\r\n";
+    uart_write_bytes(GPS_UART, reset_cmd, strlen(reset_cmd));
+}
 
 
-
-    
+static void gps_task(void *arg)
+{
     uint8_t data[128];
     char line[256];
     int idx = 0;
-    while (1) {
-        //printf("Hello printf\n");
-        //ESP_LOGI(TAG, "Hello ESP_LOGI");
-        //vTaskDelay(pdMS_TO_TICKS(1000));
+    bool in_sentence = false;
 
+    while (1) {
         int len = uart_read_bytes(GPS_UART, data, sizeof(data), pdMS_TO_TICKS(100));
 
         for (int i = 0; i < len; i++) {
             char c = data[i];
-            if (c == '\n') {
-                // remove trailing carriage return
-                if (idx > 0 && line[idx-1] == '\r') idx--;
-                line[idx] = '\0';
-                ESP_LOGI(TAG, "%s", line);
+
+            // Start of a new NMEA sentence
+            if (c == '$') {
                 idx = 0;
-                }
-            else if (idx < sizeof(line) - 1) {
+                in_sentence = true;
                 line[idx++] = c;
-                }
-            else {
-                // buffer full, reset
+                continue;
+            }
+
+            if (!in_sentence) {
+                continue;  // ignore everything until '$'
+            }
+
+            if (c == '\n') {
+                if (idx > 0 && line[idx - 1] == '\r') idx--;
+                line[idx] = '\0';
+
+                ESP_LOGI(TAG, "%s", line);
+
                 idx = 0;
+                in_sentence = false;
+                continue;
+            }
+
+            if (idx < sizeof(line) - 1) {
+                line[idx++] = c;
+            } else {
+                // overflow → abandon this sentence
+                idx = 0;
+                in_sentence = false;
             }
         }
-    } 
+    }
 }
 
 
@@ -89,8 +108,12 @@ void app_main() {
     }
     */
 
-
+    
     gps_uart_init();
+
+    vTaskDelay(pdMS_TO_TICKS(500));    
+    gps_factory_reset();
+    
     xTaskCreate(gps_task, "gps_task", 4096, NULL, 5, NULL);
 
 }
