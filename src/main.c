@@ -85,29 +85,7 @@ static void gps_task(void *arg)
 
 
 void app_main() {
-    /*
-    uart_config_t uart_config = {
-        .baud_rate = 9600, // <-- If gibberish, change this to 115200
-        .data_bits = UART_DATA_8_BITS,
-        .parity = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_DEFAULT,
-    };
-    uart_driver_install(UART_NUM_2, 1024, 0, 0, NULL, 0);
-    uart_param_config(UART_NUM_2, &uart_config);
-    uart_set_pin(UART_NUM_2, 17, 16, -1, -1);
-
-    uint8_t byte;
-    while (1) {
-        // Read 1 byte at a time and print it immediately
-        if (uart_read_bytes(UART_NUM_2, &byte, 1, portMAX_DELAY) > 0) {
-            putchar(byte); 
-            fflush(stdout); 
-        }
-    }
-    */
-
+    
     
     gps_uart_init();
 
