@@ -8,6 +8,10 @@
 
 static const char *TAG = "GPS";
 
+
+
+
+
 void gps_uart_init(void)
 {
     const uart_config_t uart_config = {
