@@ -30,6 +30,14 @@ void app_main(void) {
     // Setting it to 0x07 starts continuous pressure and temperature measurement.
     dps368_write(dev_sensor1, 0x08, 0x07);
 
+    // 3. Read Calibration Coefficients
+    uint8_t coeffs[18];
+    dps368_get_coeff(dev_sensor1, coeffs);
+
+    printf("Calibration Coefficients:\n");
+    for (int i = 0; i < 18; i++) {
+        printf("Coeff[%d]: 0x%02X\n", i, coeffs[i]);
+    }
 
     //spi_device_handle_t dev_sensor1 = NULL;
     //spi_bus_init(&dev_sensor1);
@@ -42,19 +50,12 @@ void app_main(void) {
         // 1. Force a "Wake up" by reading a random register twice
         uint8_t dummy;
         dps368_read(dev_sensor1, 0x0D, &dummy, 1); 
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(500));
         
         // 2. Now try the real ID read
         uint8_t id = 0;
         dps368_read(dev_sensor1, 0x0D, &id, 1);
         printf("Device ID: 0x%02X\n", id);
-
-
-        /*
-        uint8_t id = 0;
-        dps368_read(dev_sensor1, 0x0D, &id, 1);
-        printf("Device ID: 0x%02X\n", id);
-
 
         float raw_p = dps368_get_raw_pressure(dev_sensor1);
         
@@ -63,6 +64,6 @@ void app_main(void) {
         printf("Raw Pressure Value: %.2f\n", raw_p);
 
         vTaskDelay(pdMS_TO_TICKS(500));
-        */
+        
     }
 }

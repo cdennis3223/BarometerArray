@@ -21,7 +21,7 @@ esp_err_t spi_bus_init(spi_device_handle_t *handle_out) {
 
     spi_device_interface_config_t devcfg1 = {
         .clock_speed_hz = 1 * 1000 * 1000,
-        .mode = 0,  // DPS368 standard
+        .mode = 3,  // DPS368 standard
         .spics_io_num = PIN_NUM_CS1,
         .queue_size = 1,
     };
@@ -33,9 +33,6 @@ esp_err_t spi_bus_init(spi_device_handle_t *handle_out) {
 
 esp_err_t dps368_read(spi_device_handle_t dev, uint8_t reg, uint8_t *out, size_t len) {
     // Control byte: bit 7 = 1 for READ
-
-    
-
     uint8_t tx_data[len + 1];
     uint8_t rx_data[len + 1];
     memset(tx_data, 0, sizeof(tx_data));
@@ -56,6 +53,25 @@ esp_err_t dps368_read(spi_device_handle_t dev, uint8_t reg, uint8_t *out, size_t
     ESP_LOGI("SPI_DEBUG", "Sent: 0x%02X | Recv[0]: 0x%02X, Recv[1]: 0x%02X", tx_data[0], rx_data[0], rx_data[1]);
 
     return ESP_OK;
+}
+
+void dps368_get_coeff(spi_device_handle_t dev, uint8_t *coeffs){
+    //All coefficients are stored in registers 0x10 to 0x21 (18 bytes total)
+    //Stores the coefficients in the provided array (must be at least 18 bytes long)
+    uint8_t tx_data[19];
+    uint8_t rx_data[19];
+    memset(tx_data, 0, sizeof(tx_data));
+    tx_data[0] = 0x80 | 0x10; // Command byte to read from register 0x10
+    spi_transaction_t t ={
+        .length = 8 * 19, // Total bits (Command + 18 bytes of data)
+        .tx_buffer = tx_data,
+        .rx_buffer = rx_data,
+    };
+    spi_device_transmit(dev, &t);
+    // The first byte received is garbage (while we sent the address)
+    // The actual data starts at rx_data[1]
+    memcpy(&coeffs, &rx_data[1], 18);//Copy the 18 bytes of coefficients to the provided array
+    return;
 }
 
 float dps368_get_raw_pressure(spi_device_handle_t dev) {
