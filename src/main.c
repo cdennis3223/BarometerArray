@@ -8,6 +8,7 @@
 #include "DPS.h"
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
+#include <inttypes.h>
 
 
 void app_main(void) {
@@ -30,13 +31,13 @@ void app_main(void) {
     // Setting it to 0x07 starts continuous pressure and temperature measurement.
     dps368_write(dev_sensor1, 0x08, 0x07);
 
-    // 3. Read Calibration Coefficients
-    uint8_t coeffs[18];
+    // 3. Read Calibration Coefficients there are 8 coefficients, c0 and c1 are 12 bits, the rest are 16 bits
+    uint32_t coeffs[8];
     dps368_get_coeff(dev_sensor1, coeffs);
 
     printf("Calibration Coefficients:\n");
-    for (int i = 0; i < 18; i++) {
-        printf("Coeff[%d]: 0x%02X\n", i, coeffs[i]);
+    for (int i = 0; i < 8; i++) {
+        printf("Coeff[%d]: 0x%08" PRIX32 "\n", i, coeffs[i]);
     }
 
     //spi_device_handle_t dev_sensor1 = NULL;

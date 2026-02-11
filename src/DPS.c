@@ -29,7 +29,24 @@ esp_err_t spi_bus_init(spi_device_handle_t *handle_out) {
     return spi_bus_add_device(SPI2_HOST, &devcfg1, handle_out);
 }
 
+int corrected_pressure(float raw_pressure, float raw_temp, uint16_t *coeffs){
+    //This function takes the raw_pressure value and utilizes the coefficients and kP value
+    //to correct it per dps368 datasheet, kP for our sample rate is 253952, kT is the same
+    uint32_t corrected_pressure;
+    uint16_t kP = 253952;
+    uint16_t kT = 253952;
+    float T_raw_sc;
+    float P_raw_sc;
+    T_raw_sc = raw_temp/kT;
+    P_raw_sc = raw_pressure/kP;
 
+    //Pcomp(Pa) = c00 + Praw_sc*(c10 + Praw_sc *(c20+ Praw_sc *c30)) + Traw_sc *c01 +
+    //Traw_sc *Praw_sc *(c11+Praw_sc*c21), from datasheet
+    float comp_pressure;
+    comp_pressure = coeffs[3] + P_raw_sc*(coeffs[10] + P_raw_sc *(coeffs[20]+ P_raw_sc *coeffs[30])) + T_raw_sc *coeffs[1] +
+    T_raw_sc *P_raw_sc *(coeffs[11]+P_raw_sc*coeffs[21]);
+    return (int)comp_pressure;
+}
 
 esp_err_t dps368_read(spi_device_handle_t dev, uint8_t reg, uint8_t *out, size_t len) {
     // Control byte: bit 7 = 1 for READ
@@ -55,9 +72,9 @@ esp_err_t dps368_read(spi_device_handle_t dev, uint8_t reg, uint8_t *out, size_t
     return ESP_OK;
 }
 
-void dps368_get_coeff(spi_device_handle_t dev, uint8_t *coeffs){
-    //All coefficients are stored in registers 0x10 to 0x21 (18 bytes total)
-    //Stores the coefficients in the provided array (must be at least 18 bytes long)
+void dps368_get_coeff(spi_device_handle_t dev, uint32_t *coeffs){
+    //All coefficients are stored in registers 0x10 to 0x21 coefficients are 12 bit numbers
+    //Stores the coefficients in the provided array
     uint8_t tx_data[19];
     uint8_t rx_data[19];
     memset(tx_data, 0, sizeof(tx_data));
@@ -69,9 +86,36 @@ void dps368_get_coeff(spi_device_handle_t dev, uint8_t *coeffs){
     };
     spi_device_transmit(dev, &t);
     // The first byte received is garbage (while we sent the address)
-    // The actual data starts at rx_data[1]
-    memcpy(&coeffs, &rx_data[1], 18);//Copy the 18 bytes of coefficients to the provided array
+    // The actual data starts at rx_data[1] coefficients c0,c1 are 12 bits, the rest are 16 bits
+    coeffs[0] = (rx_data[1]) | ((rx_data[2] & 0xF0) << 4);//c0
+    coeffs[1] = ((rx_data[2] & 0x0F) << 8) | rx_data[3];//c1
+    coeffs[2] = (rx_data[4]) << 12 | (rx_data[5] << 4) | ((rx_data[6] & 0xF0) >> 4);//c00
+    coeffs[3] = ((rx_data[6] & 0x0F) << 16) | (rx_data[7]<<12) | (rx_data[8]);//c10
+    coeffs[4] = (rx_data[9] << 8) | (rx_data[10]);//c01
+    coeffs[5] = (rx_data[11] << 8) | (rx_data[12]);//c11
+    coeffs[6] = (rx_data[13] << 8) | (rx_data[14]);//c20
+    coeffs[7] = (rx_data[15] << 8) | (rx_data[16]);//c21
+    coeffs[8] = (rx_data[17] << 8) | (rx_data[18]);//c30
     return;
+}
+
+float dps368_get_raw_temp(spi_device_handle_t dev){
+    uint8_t raw_data[3];
+    // Temperature is stored in 3 registers: 0x03, 0x04, 0x05
+    esp_err_t ret = dps368_read(dev, 0x03, raw_data, 3);
+    
+    if (ret != ESP_OK) return -1.0;
+
+    // Combine 3 bytes into a single 24-bit integer
+    // The DPS368 uses Two's Complement for its 24-bit values
+    int32_t val = (raw_data[0] << 16) | (raw_data[1] << 8) | raw_data[2];
+    
+    // Handle the sign bit for 24-bit (if bit 23 is 1, it's negative)
+    if (val & 0x800000) {
+        val -= 0x1000000;
+    }
+
+    return (float)val;
 }
 
 float dps368_get_raw_pressure(spi_device_handle_t dev) {

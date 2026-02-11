@@ -16,7 +16,7 @@ esp_err_t spi_bus_init(spi_device_handle_t *handle_out);
 esp_err_t dps368_read(spi_device_handle_t dev, uint8_t reg, uint8_t *out, size_t len);
 
 //This gets the coefficients required for pressure calc. stores them in a provided array
-void dps368_get_coeff(spi_device_handle_t dev, uint8_t *coeffs);
+void dps368_get_coeff(spi_device_handle_t dev, uint32_t *coeffs);
 
 float dps368_get_raw_pressure(spi_device_handle_t dev);
 
