@@ -32,7 +32,7 @@ void app_main(void) {
     dps368_write(dev_sensor1, 0x08, 0x07);
 
     // 3. Read Calibration Coefficients there are 8 coefficients, c0 and c1 are 12 bits, the rest are 16 bits
-    uint32_t coeffs[8];
+    uint32_t coeffs[9];
     dps368_get_coeff(dev_sensor1, coeffs);
 
     printf("Calibration Coefficients:\n");
@@ -59,10 +59,18 @@ void app_main(void) {
         printf("Device ID: 0x%02X\n", id);
 
         float raw_p = dps368_get_raw_pressure(dev_sensor1);
+        float raw_t = dps368_get_raw_temp(dev_sensor1);
         
         // This prints the raw decimal value
         // To get hPa (e.g. 1013.25), you need the calibration coefficients
         printf("Raw Pressure Value: %.2f\n", raw_p);
+        printf("Raw Temperature Value: %.2f\n", raw_t);
+
+        int corrected_p = corrected_pressure(raw_p, raw_t, coeffs);
+        printf("Corrected Pressure Value: %d Pa\n", corrected_p);
+
+        int corrected_t = corrected_temperature(raw_t, coeffs);
+        printf("Corrected Temperature Value: %d °C\n", corrected_t);
 
         vTaskDelay(pdMS_TO_TICKS(500));
         

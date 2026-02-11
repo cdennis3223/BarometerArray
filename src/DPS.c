@@ -29,25 +29,6 @@ esp_err_t spi_bus_init(spi_device_handle_t *handle_out) {
     return spi_bus_add_device(SPI2_HOST, &devcfg1, handle_out);
 }
 
-int corrected_pressure(float raw_pressure, float raw_temp, uint16_t *coeffs){
-    //This function takes the raw_pressure value and utilizes the coefficients and kP value
-    //to correct it per dps368 datasheet, kP for our sample rate is 253952, kT is the same
-    uint32_t corrected_pressure;
-    uint16_t kP = 253952;
-    uint16_t kT = 253952;
-    float T_raw_sc;
-    float P_raw_sc;
-    T_raw_sc = raw_temp/kT;
-    P_raw_sc = raw_pressure/kP;
-
-    //Pcomp(Pa) = c00 + Praw_sc*(c10 + Praw_sc *(c20+ Praw_sc *c30)) + Traw_sc *c01 +
-    //Traw_sc *Praw_sc *(c11+Praw_sc*c21), from datasheet
-    float comp_pressure;
-    comp_pressure = coeffs[3] + P_raw_sc*(coeffs[10] + P_raw_sc *(coeffs[20]+ P_raw_sc *coeffs[30])) + T_raw_sc *coeffs[1] +
-    T_raw_sc *P_raw_sc *(coeffs[11]+P_raw_sc*coeffs[21]);
-    return (int)comp_pressure;
-}
-
 esp_err_t dps368_read(spi_device_handle_t dev, uint8_t reg, uint8_t *out, size_t len) {
     // Control byte: bit 7 = 1 for READ
     uint8_t tx_data[len + 1];
@@ -70,6 +51,15 @@ esp_err_t dps368_read(spi_device_handle_t dev, uint8_t reg, uint8_t *out, size_t
     ESP_LOGI("SPI_DEBUG", "Sent: 0x%02X | Recv[0]: 0x%02X, Recv[1]: 0x%02X", tx_data[0], rx_data[0], rx_data[1]);
 
     return ESP_OK;
+}
+
+esp_err_t dps368_write(spi_device_handle_t dev, uint8_t reg, uint8_t val) {
+    uint8_t tx_data[2] = { reg & 0x7F, val }; // MSB = 0 for WRITE
+    spi_transaction_t t = {
+        .length = 16,
+        .tx_buffer = tx_data,
+    };
+    return spi_device_transmit(dev, &t);
 }
 
 void dps368_get_coeff(spi_device_handle_t dev, uint32_t *coeffs){
@@ -137,11 +127,36 @@ float dps368_get_raw_pressure(spi_device_handle_t dev) {
     return (float)val;
 }
 
-esp_err_t dps368_write(spi_device_handle_t dev, uint8_t reg, uint8_t val) {
-    uint8_t tx_data[2] = { reg & 0x7F, val }; // MSB = 0 for WRITE
-    spi_transaction_t t = {
-        .length = 16,
-        .tx_buffer = tx_data,
-    };
-    return spi_device_transmit(dev, &t);
+float corrected_pressure(float raw_pressure, float raw_temp, uint32_t *coeffs){
+    //This function takes the raw_pressure value and utilizes the coefficients and kP value
+    //to correct it per dps368 datasheet, kP for our sample rate is 253952, kT is the same
+    uint32_t corrected_pressure;
+    uint16_t kP = 253952;
+    uint16_t kT = 253952;
+    float T_raw_sc;
+    float P_raw_sc;
+    T_raw_sc = raw_temp/kT;
+    P_raw_sc = raw_pressure/kP;
+
+    //Pcomp(Pa) = c00 + Praw_sc*(c10 + Praw_sc *(c20+ Praw_sc *c30)) + Traw_sc *c01 +
+    //Traw_sc *Praw_sc *(c11+Praw_sc*c21), from datasheet
+    float comp_pressure;
+    comp_pressure = coeffs[2] + P_raw_sc*(coeffs[3] + P_raw_sc *(coeffs[6]+ P_raw_sc *coeffs[8])) + T_raw_sc *coeffs[4] +
+    T_raw_sc *P_raw_sc *(coeffs[5]+P_raw_sc*coeffs[7]);
+    return comp_pressure;
 }
+
+float corrected_temperature(float raw_temp, uint32_t *coeffs){
+    //This function takes the raw_temp value and utilizes the coefficients and kT value
+    //to correct it per dps368 datasheet, kT for our sample rate is 253952
+    uint16_t kT = 253952;
+    float T_raw_sc;
+    T_raw_sc = raw_temp/kT;
+
+    //Tcomp(°C) = c0*0.5 + c1*Traw_sc, from datasheet
+    float comp_temp;
+    comp_temp = (coeffs[0]*0.5) + (coeffs[1]*T_raw_sc);
+    return comp_temp;
+}
+
+
