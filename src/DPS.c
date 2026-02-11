@@ -62,7 +62,12 @@ esp_err_t dps368_write(spi_device_handle_t dev, uint8_t reg, uint8_t val) {
     return spi_device_transmit(dev, &t);
 }
 
-void dps368_get_coeff(spi_device_handle_t dev, uint32_t *coeffs){
+int32_t sign_extend(uint32_t val, int bits) {
+    uint32_t m = 1u << (bits - 1);
+    return (val ^ m) - m;        
+}
+
+void dps368_get_coeff(spi_device_handle_t dev, int32_t *coeffs){
     //All coefficients are stored in registers 0x10 to 0x21 coefficients are 12 bit numbers
     //Stores the coefficients in the provided array
     uint8_t tx_data[19];
@@ -76,16 +81,33 @@ void dps368_get_coeff(spi_device_handle_t dev, uint32_t *coeffs){
     };
     spi_device_transmit(dev, &t);
     // The first byte received is garbage (while we sent the address)
-    // The actual data starts at rx_data[1] coefficients c0,c1 are 12 bits, the rest are 16 bits
-    coeffs[0] = (rx_data[1]) | ((rx_data[2] & 0xF0) << 4);//c0
-    coeffs[1] = ((rx_data[2] & 0x0F) << 8) | rx_data[3];//c1
-    coeffs[2] = (rx_data[4]) << 12 | (rx_data[5] << 4) | ((rx_data[6] & 0xF0) >> 4);//c00
-    coeffs[3] = ((rx_data[6] & 0x0F) << 16) | (rx_data[7]<<12) | (rx_data[8]);//c10
-    coeffs[4] = (rx_data[9] << 8) | (rx_data[10]);//c01
-    coeffs[5] = (rx_data[11] << 8) | (rx_data[12]);//c11
-    coeffs[6] = (rx_data[13] << 8) | (rx_data[14]);//c20
-    coeffs[7] = (rx_data[15] << 8) | (rx_data[16]);//c21
-    coeffs[8] = (rx_data[17] << 8) | (rx_data[18]);//c30
+    // The actual data starts at rx_data[1] coefficients c0,c1 are 12 bits,c00 and c10 are 20, 
+    //the rest are 16 bits
+    uint32_t dummy[9];
+    dummy[0] = (rx_data[1]) | ((rx_data[2] & 0xF0) << 4);//c0
+    dummy[1] = ((rx_data[2] & 0x0F) << 8) | rx_data[3];//c1
+    dummy[2] = (rx_data[4]) << 12 | (rx_data[5] << 4) | ((rx_data[6] & 0xF0) >> 4);//c00
+    dummy[3] = ((rx_data[6] & 0x0F) << 16) | (rx_data[7]<<12) | (rx_data[8]);//c10
+    dummy[4] = (rx_data[9] << 8) | (rx_data[10]);//c01
+    dummy[5] = (rx_data[11] << 8) | (rx_data[12]);//c11
+    dummy[6] = (rx_data[13] << 8) | (rx_data[14]);//c20
+    dummy[7] = (rx_data[15] << 8) | (rx_data[16]);//c21
+    dummy[8] = (rx_data[17] << 8) | (rx_data[18]);//c30
+
+    for (int i=0;i<9;i++){
+        printf("dummy[%d]: 0x%08" PRIX32 "\n", i, dummy[i]);
+    }
+
+    //Handle the sign for the 12 and 20 bit values
+    coeffs[0] = sign_extend(dummy[0], 12);
+    coeffs[1] = sign_extend(dummy[1], 12);
+    coeffs[2] = sign_extend(dummy[2], 20);
+    coeffs[3] = sign_extend(dummy[3], 20);
+    coeffs[4] = sign_extend(dummy[4], 16);
+    coeffs[5] = sign_extend(dummy[5], 16);
+    coeffs[6] = sign_extend(dummy[6], 16);
+    coeffs[7] = sign_extend(dummy[7], 16);
+    coeffs[8] = sign_extend(dummy[8], 16);
     return;
 }
 
@@ -101,9 +123,7 @@ float dps368_get_raw_temp(spi_device_handle_t dev){
     int32_t val = (raw_data[0] << 16) | (raw_data[1] << 8) | raw_data[2];
     
     // Handle the sign bit for 24-bit (if bit 23 is 1, it's negative)
-    if (val & 0x800000) {
-        val -= 0x1000000;
-    }
+    val = sign_extend(val, 24);
 
     return (float)val;
 }
@@ -120,14 +140,12 @@ float dps368_get_raw_pressure(spi_device_handle_t dev) {
     int32_t val = (raw_data[0] << 16) | (raw_data[1] << 8) | raw_data[2];
     
     // Handle the sign bit for 24-bit (if bit 23 is 1, it's negative)
-    if (val & 0x800000) {
-        val -= 0x1000000;
-    }
+    val = sign_extend(val, 24);
 
     return (float)val;
 }
 
-float corrected_pressure(float raw_pressure, float raw_temp, uint32_t *coeffs){
+float corrected_pressure(float raw_pressure, float raw_temp, int32_t *coeffs){
     //This function takes the raw_pressure value and utilizes the coefficients and kP value
     //to correct it per dps368 datasheet, kP for our sample rate is 253952, kT is the same
     uint32_t corrected_pressure;
@@ -146,7 +164,7 @@ float corrected_pressure(float raw_pressure, float raw_temp, uint32_t *coeffs){
     return comp_pressure;
 }
 
-float corrected_temperature(float raw_temp, uint32_t *coeffs){
+float corrected_temperature(float raw_temp, int32_t *coeffs){
     //This function takes the raw_temp value and utilizes the coefficients and kT value
     //to correct it per dps368 datasheet, kT for our sample rate is 253952
     uint16_t kT = 253952;

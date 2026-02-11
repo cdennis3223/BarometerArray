@@ -27,16 +27,22 @@ void app_main(void) {
     // Note: You'll need a dps368_write function similar to your read function
     // For now, let's assume it's configured or using default one-shot.
 
+    //Configure pressure and temperature measurement OSR(OverSampling Rate)
+    dps368_write(dev_sensor1, 0x06, 0x14); // Set pressure OSR to 16
+    dps368_write(dev_sensor1, 0x07, 0x14); // Set temperature OSR to 16
+
+
     // Register 0x08 is MEAS_CFG. 
     // Setting it to 0x07 starts continuous pressure and temperature measurement.
     dps368_write(dev_sensor1, 0x08, 0x07);
+    dps368_write(dev_sensor1, 0x09, 0x0C); // Set CFG_REG to allow pressure/temp shift
 
     // 3. Read Calibration Coefficients there are 8 coefficients, c0 and c1 are 12 bits, the rest are 16 bits
-    uint32_t coeffs[9];
+    int32_t coeffs[9];
     dps368_get_coeff(dev_sensor1, coeffs);
 
     printf("Calibration Coefficients:\n");
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 9; i++) {
         printf("Coeff[%d]: 0x%08" PRIX32 "\n", i, coeffs[i]);
     }
 
