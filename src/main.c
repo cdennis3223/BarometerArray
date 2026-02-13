@@ -21,6 +21,8 @@ void app_main(void) {
         return;
     }
 
+    vTaskDelay(pdMS_TO_TICKS(3000)); //Give time to enter monitor
+
     // 2. Configure Sensor (Set to Background Mode, High Precision)
     // Register 0x08 (MEAS_CFG): Set bits to enable pressure and temperature
     //uint8_t config_val = 0x07; // Continuous measurement mode
@@ -29,7 +31,7 @@ void app_main(void) {
 
     //Configure pressure and temperature measurement OSR(OverSampling Rate)
     dps368_write(dev_sensor1, 0x06, 0x14); // Set pressure OSR to 16
-    dps368_write(dev_sensor1, 0x07, 0x14); // Set temperature OSR to 16
+    dps368_write(dev_sensor1, 0x07, 0x94); // Set temperature OSR to 16
 
 
     // Register 0x08 is MEAS_CFG. 
@@ -37,14 +39,16 @@ void app_main(void) {
     dps368_write(dev_sensor1, 0x08, 0x07);
     dps368_write(dev_sensor1, 0x09, 0x0C); // Set CFG_REG to allow pressure/temp shift
 
+    
+
+    vTaskDelay(pdMS_TO_TICKS(100)); // Wait for sensor to stabilize
+
+    dps368_read(dev_sensor1, 0x28, &v, 1); ESP_LOGI("CFG","INT_STS  0x28 = 0x%02X", v);
+    //bit 7 of 0x28 is a 1 therefore we are using external temp_sensor
+
     // 3. Read Calibration Coefficients there are 8 coefficients, c0 and c1 are 12 bits, the rest are 16 bits
     int32_t coeffs[9];
     dps368_get_coeff(dev_sensor1, coeffs);
-
-    printf("Calibration Coefficients:\n");
-    for (int i = 0; i < 9; i++) {
-        printf("Coeff[%d]: 0x%08" PRIX32 "\n", i, coeffs[i]);
-    }
 
     //spi_device_handle_t dev_sensor1 = NULL;
     //spi_bus_init(&dev_sensor1);
@@ -64,13 +68,13 @@ void app_main(void) {
         dps368_read(dev_sensor1, 0x0D, &id, 1);
         printf("Device ID: 0x%02X\n", id);
 
-        float raw_p = dps368_get_raw_pressure(dev_sensor1);
-        float raw_t = dps368_get_raw_temp(dev_sensor1);
+        int32_t raw_p = dps368_get_raw_pressure(dev_sensor1);
+        int32_t raw_t = dps368_get_raw_temp(dev_sensor1);
         
         // This prints the raw decimal value
         // To get hPa (e.g. 1013.25), you need the calibration coefficients
-        printf("Raw Pressure Value: %.2f\n", raw_p);
-        printf("Raw Temperature Value: %.2f\n", raw_t);
+        printf("Raw Pressure Value:%" PRId32 "\n", raw_p);
+        printf("Raw Temperature Value:%" PRId32"\n", raw_t);
 
         int corrected_p = corrected_pressure(raw_p, raw_t, coeffs);
         printf("Corrected Pressure Value: %d Pa\n", corrected_p);
