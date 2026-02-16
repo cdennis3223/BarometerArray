@@ -12,39 +12,16 @@
 
 
 void app_main(void) {
-    spi_device_handle_t dev_sensor1 = NULL;
-    //uint8_t buf[1];
-
     // 1. Setup SPI
+    spi_device_handle_t dev_sensor1 = NULL;
+
     if (spi_bus_init(&dev_sensor1) != ESP_OK) {
         ESP_LOGE("MAIN", "SPI Init Failed");
         return;
     }
 
-    vTaskDelay(pdMS_TO_TICKS(3000)); //Give time to enter monitor
-
-    // 2. Configure Sensor (Set to Background Mode, High Precision)
-    // Register 0x08 (MEAS_CFG): Set bits to enable pressure and temperature
-    //uint8_t config_val = 0x07; // Continuous measurement mode
-    // Note: You'll need a dps368_write function similar to your read function
-    // For now, let's assume it's configured or using default one-shot.
-
-    //Configure pressure and temperature measurement OSR(OverSampling Rate)
-    dps368_write(dev_sensor1, 0x06, 0x14); // Set pressure OSR to 16
-    dps368_write(dev_sensor1, 0x07, 0x94); // Set temperature OSR to 16
-
-
-    // Register 0x08 is MEAS_CFG. 
-    // Setting it to 0x07 starts continuous pressure and temperature measurement.
-    dps368_write(dev_sensor1, 0x08, 0x07);
-    dps368_write(dev_sensor1, 0x09, 0x0C); // Set CFG_REG to allow pressure/temp shift
-
+    dps368_init();
     
-
-    vTaskDelay(pdMS_TO_TICKS(100)); // Wait for sensor to stabilize
-
-    dps368_read(dev_sensor1, 0x28, &v, 1); ESP_LOGI("CFG","INT_STS  0x28 = 0x%02X", v);
-    //bit 7 of 0x28 is a 1 therefore we are using external temp_sensor
 
     // 3. Read Calibration Coefficients there are 8 coefficients, c0 and c1 are 12 bits, the rest are 16 bits
     int32_t coeffs[9];
