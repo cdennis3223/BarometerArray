@@ -20,8 +20,7 @@ void app_main(void) {
         return;
     }
 
-    dps368_init();
-    
+    dps368_init(dev_sensor1);
 
     // 3. Read Calibration Coefficients there are 8 coefficients, c0 and c1 are 12 bits, the rest are 16 bits
     int32_t coeffs[9];
@@ -30,8 +29,19 @@ void app_main(void) {
     //spi_device_handle_t dev_sensor1 = NULL;
     //spi_bus_init(&dev_sensor1);
 
-    
+    //4. Setup file for reading and writing to SD card
+     if (sd_init() != ESP_OK) {
+        ESP_LOGE("MAIN", "SD Card Init Failed");
+        return;
+    }
 
+    FILE *f = fopen("/sdcard/data.csv", "w+");
+    if (f == NULL) {
+        ESP_LOGE("MAIN", "Failed to open file for writing");
+        return;
+    }
+
+    fprintf(f, "Corrected Pressure (Pa),Corrected Temperature (°C)\n");
 
     while(1) {
 
@@ -60,6 +70,12 @@ void app_main(void) {
         printf("Corrected Temperature Value: %d °C\n", corrected_t);
 
         vTaskDelay(pdMS_TO_TICKS(500));
+
         
+    
+    // Will need to implement a shutdown procedure eventually
+    //Close the file and deinitialize SD Card and turn off sensors etc.
     }
+
+
 }

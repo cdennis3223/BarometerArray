@@ -62,35 +62,32 @@ esp_err_t dps368_write(spi_device_handle_t dev, uint8_t reg, uint8_t val) {
     return spi_device_transmit(dev, &t);
 }
 
-void dps368_init(){
+void dps368_init(spi_device_handle_t dev) {
     // This function can be used to set default configurations
-    spi_device_handle_t dev_sensor1 = NULL;
     
     // Register 0x08 is MEAS_CFG. Sets how the sensor takes measurements, can be used to check status
     // of the sensor
     // Setting it to 0x07 starts continuous pressure and temperature measurement.
-    dps368_write(dev_sensor1, 0x08, 0x07);
-    dps368_write(dev_sensor1, 0x09, 0x0C); // Set CFG_REG to allow pressure/temp shift
+    dps368_write(dev, 0x08, 0x07);
+    dps368_write(dev, 0x09, 0x0C); // Set CFG_REG to allow pressure/temp shift
 
     //check the temp sensor source, bit 7 of 0x28
     uint8_t temp_source;
-    temp_source = dps368_read(dev_sensor1, 0x28, &temp_source, 1) & 0x80;
+    temp_source = dps368_read(dev, 0x28, &temp_source, 1) & 0x80;
 
     //Configure pressure and temperature measurement OSR(OverSampling Rate),
     //bits 4,5,6 set rate, bits 0-3 set the OSR, bit 7 in 0x07 sets temp sensor source
     //necessary to check temp sensor source for coefficient correction
-    dps368_write(dev_sensor1, 0x06, 0x14); // Set pressure OSR to 16
+    dps368_write(dev, 0x06, 0x14); // Set pressure OSR to 16
     
     if(temp_source == 0){
-        dps368_write(dev_sensor1, 0x07, 0x94); // Set temperature OSR to 16 and use external temp sensor
+        dps368_write(dev, 0x07, 0x94); // Set temperature OSR to 16 and use external temp sensor
     }
     else{
-        dps368_write(dev_sensor1, 0x07, 0x14); // Set temperature OSR to 16 and use internal temp sensor
+        dps368_write(dev, 0x07, 0x14); // Set temperature OSR to 16 and use internal temp sensor
     }
 
-
     return;
-    
 }
 
 int32_t sign_extend(uint32_t val, int bits) {

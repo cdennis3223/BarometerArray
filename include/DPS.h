@@ -15,7 +15,7 @@ esp_err_t spi_bus_init(spi_device_handle_t *handle_out);
 // This matches your signature
 esp_err_t dps368_read(spi_device_handle_t dev, uint8_t reg, uint8_t *out, size_t len);
 
-void dps368_init();
+void dps368_init(spi_device_handle_t dev);
 
 //This gets the coefficients required for pressure calc. stores them in a provided array
 void dps368_get_coeff(spi_device_handle_t dev, int32_t *coeffs);
