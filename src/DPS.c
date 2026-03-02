@@ -29,7 +29,8 @@ esp_err_t spi_bus_init(spi_device_handle_t *handle_out) {
     return spi_bus_add_device(SPI2_HOST, &devcfg1, handle_out);
 }
 
-esp_err_t dps368_read(spi_device_handle_t dev, uint8_t reg, uint8_t *out, size_t len) {
+
+static esp_err_t dps368_read(spi_device_handle_t dev, uint8_t reg, uint8_t *out, size_t len) {
     // Control byte: bit 7 = 1 for READ
     uint8_t tx_data[len + 1];
     uint8_t rx_data[len + 1];
@@ -48,12 +49,12 @@ esp_err_t dps368_read(spi_device_handle_t dev, uint8_t reg, uint8_t *out, size_t
     // The first byte received is garbage (while we sent the address)
     // The actual data starts at rx_data[1]
     memcpy(out, &rx_data[1], len);
-    ESP_LOGI("SPI_DEBUG", "Sent: 0x%02X | Recv[0]: 0x%02X, Recv[1]: 0x%02X", tx_data[0], rx_data[0], rx_data[1]);
+    //ESP_LOGI("SPI_DEBUG", "Sent: 0x%02X | Recv[0]: 0x%02X, Recv[1]: 0x%02X", tx_data[0], rx_data[0], rx_data[1]);
 
     return ESP_OK;
 }
 
-esp_err_t dps368_write(spi_device_handle_t dev, uint8_t reg, uint8_t val) {
+static esp_err_t dps368_write(spi_device_handle_t dev, uint8_t reg, uint8_t val) {
     uint8_t tx_data[2] = { reg & 0x7F, val }; // MSB = 0 for WRITE
     spi_transaction_t t = {
         .length = 16,
@@ -62,40 +63,12 @@ esp_err_t dps368_write(spi_device_handle_t dev, uint8_t reg, uint8_t val) {
     return spi_device_transmit(dev, &t);
 }
 
-void dps368_init(spi_device_handle_t dev) {
-    // This function can be used to set default configurations
-    
-    // Register 0x08 is MEAS_CFG. Sets how the sensor takes measurements, can be used to check status
-    // of the sensor
-    // Setting it to 0x07 starts continuous pressure and temperature measurement.
-    dps368_write(dev, 0x08, 0x07);
-    dps368_write(dev, 0x09, 0x0C); // Set CFG_REG to allow pressure/temp shift
-
-    //check the temp sensor source, bit 7 of 0x28
-    uint8_t temp_source;
-    temp_source = dps368_read(dev, 0x28, &temp_source, 1) & 0x80;
-
-    //Configure pressure and temperature measurement OSR(OverSampling Rate),
-    //bits 4,5,6 set rate, bits 0-3 set the OSR, bit 7 in 0x07 sets temp sensor source
-    //necessary to check temp sensor source for coefficient correction
-    dps368_write(dev, 0x06, 0x14); // Set pressure OSR to 16
-    
-    if(temp_source == 0){
-        dps368_write(dev, 0x07, 0x94); // Set temperature OSR to 16 and use external temp sensor
-    }
-    else{
-        dps368_write(dev, 0x07, 0x14); // Set temperature OSR to 16 and use internal temp sensor
-    }
-
-    return;
-}
-
-int32_t sign_extend(uint32_t val, int bits) {
+static int32_t sign_extend(uint32_t val, int bits) {
     uint32_t m = 1u << (bits - 1);
     return (val ^ m) - m;        
 }
 
-void dps368_get_coeff(spi_device_handle_t dev, int32_t *coeffs){
+static void dps368_get_coeff(spi_device_handle_t dev, int32_t *coeffs){
     //All coefficients are stored in registers 0x10 to 0x21 coefficients are 12 bit numbers
     //Stores the coefficients in the provided array
     uint8_t tx_data[19];
@@ -137,7 +110,50 @@ void dps368_get_coeff(spi_device_handle_t dev, int32_t *coeffs){
     return;
 }
 
-int32_t dps368_get_raw_temp(spi_device_handle_t dev){
+
+
+void dps368_init(dps368_t *dev, spi_device_handle_t spi_handle) {
+    // This function can be used to set default configurations
+
+
+
+    dev->spi = spi_handle;
+    //dev->coefficients = z
+   
+    // Register 0x08 is MEAS_CFG. Sets how the sensor takes measurements, can be used to check status
+    // of the sensor
+    // Setting it to 0x07 starts continuous pressure and temperature measurement.
+    dps368_write(dev->spi, 0x08, 0x07);
+    dps368_write(dev->spi, 0x09, 0x0C); // Set CFG_REG to allow pressure/temp shift
+
+    //check the temp sensor source, bit 7 of 0x28
+    uint8_t temp_source;
+    temp_source = dps368_read(dev->spi, 0x28, &temp_source, 1) & 0x80;
+
+    //Configure pressure and temperature measurement OSR(OverSampling Rate),
+    //bits 4,5,6 set rate, bits 0-3 set the OSR, bit 7 in 0x07 sets temp sensor source
+    //necessary to check temp sensor source for coefficient correction
+    dps368_write(dev->spi, 0x06, 0x14); // Set pressure OSR to 16
+    
+    if(temp_source == 0){
+        dps368_write(dev->spi, 0x07, 0x94); // Set temperature OSR to 16 and use external temp sensor
+    }
+    else{
+        dps368_write(dev->spi, 0x07, 0x14); // Set temperature OSR to 16 and use internal temp sensor
+    }
+
+
+
+        // 3. Read Calibration Coefficients there are 8 coefficients, c0 and c1 are 12 bits, the rest are 16 bits
+    //int32_t coeffs[9];
+    dps368_get_coeff(dev->spi, dev->coeffs);
+
+
+
+    //return;
+}
+
+static int32_t dps368_get_raw_temp(spi_device_handle_t dev){
     uint8_t raw_data[3];
     // Temperature is stored in 3 registers: 0x03, 0x04, 0x05
     esp_err_t ret = dps368_read(dev, 0x03, raw_data, 3);
@@ -154,7 +170,8 @@ int32_t dps368_get_raw_temp(spi_device_handle_t dev){
     return val;
 }
 
-int32_t dps368_get_raw_pressure(spi_device_handle_t dev) {
+
+static int32_t dps368_get_raw_pressure(spi_device_handle_t dev) {
     uint8_t raw_data[3];
     // Pressure is stored in 3 registers: 0x00, 0x01, 0x02
     esp_err_t ret = dps368_read(dev, 0x00, raw_data, 3);
@@ -171,15 +188,23 @@ int32_t dps368_get_raw_pressure(spi_device_handle_t dev) {
     return val;
 }
 
-float corrected_pressure(float raw_pressure, float raw_temp, int32_t *coeffs){
+
+float corrected_pressure(dps368_t *dev){
     //This function takes the raw_pressure value and utilizes the coefficients and kP value
     //to correct it per dps368 datasheet, kP for our sample rate is 253952, kT is the same
+    
+    int32_t raw_p = dps368_get_raw_pressure(dev->spi);
+    int32_t raw_t = dps368_get_raw_temp(dev->spi);
+    
+    
+    
+    int32_t *coeffs = dev->coeffs;
     uint32_t kP = 253952;
     uint32_t kT = 253952;
     float T_raw_sc;
     float P_raw_sc;
-    T_raw_sc = raw_temp/kT;
-    P_raw_sc = raw_pressure/kP;
+    T_raw_sc = (float)raw_t/(float)kT;
+    P_raw_sc = (float)raw_p/(float)kP;
 
     //Pcomp(Pa) = c00 + Praw_sc*(c10 + Praw_sc *(c20+ Praw_sc *c30)) + Traw_sc *c01 +
     //Traw_sc *Praw_sc *(c11+Praw_sc*c21), from datasheet
@@ -189,9 +214,10 @@ float corrected_pressure(float raw_pressure, float raw_temp, int32_t *coeffs){
     return comp_pressure;
 }
 
-float corrected_temperature(float raw_temp, int32_t *coeffs){
+float corrected_temperature(float raw_temp, dps368_t *dev){
     //This function takes the raw_temp value and utilizes the coefficients and kT value
     //to correct it per dps368 datasheet, kT for our sample rate is 253952
+    int32_t *coeffs = dev->coeffs;
     uint32_t kT = 253952;
     float T_raw_sc;
     T_raw_sc = raw_temp/kT;
@@ -201,5 +227,3 @@ float corrected_temperature(float raw_temp, int32_t *coeffs){
     comp_temp = (coeffs[0]*0.5) + (coeffs[1]*T_raw_sc);
     return comp_temp;
 }
-
-
