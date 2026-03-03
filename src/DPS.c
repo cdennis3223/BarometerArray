@@ -68,6 +68,8 @@ static int32_t sign_extend(uint32_t val, int bits) {
     return (val ^ m) - m;        
 }
 
+//This gets the coefficients required for pressure calc. stores them in a provided array
+//void dps368_get_coeff(spi_device_handle_t dev, int32_t *coeffs);
 static void dps368_get_coeff(spi_device_handle_t dev, int32_t *coeffs){
     //All coefficients are stored in registers 0x10 to 0x21 coefficients are 12 bit numbers
     //Stores the coefficients in the provided array
@@ -106,23 +108,14 @@ static void dps368_get_coeff(spi_device_handle_t dev, int32_t *coeffs){
     coeffs[6] = sign_extend(dummy[6], 16);
     coeffs[7] = sign_extend(dummy[7], 16);
     coeffs[8] = sign_extend(dummy[8], 16);
-
-    return;
 }
 
 
-
 void dps368_init(dps368_t *dev, spi_device_handle_t spi_handle) {
-    // This function can be used to set default configurations
-
-
-
     dev->spi = spi_handle;
-    //dev->coefficients = z
    
     // Register 0x08 is MEAS_CFG. Sets how the sensor takes measurements, can be used to check status
-    // of the sensor
-    // Setting it to 0x07 starts continuous pressure and temperature measurement.
+    // of the sensor. Setting it to 0x07 starts continuous pressure and temperature measurement.
     dps368_write(dev->spi, 0x08, 0x07);
     dps368_write(dev->spi, 0x09, 0x0C); // Set CFG_REG to allow pressure/temp shift
 
@@ -142,15 +135,8 @@ void dps368_init(dps368_t *dev, spi_device_handle_t spi_handle) {
         dps368_write(dev->spi, 0x07, 0x14); // Set temperature OSR to 16 and use internal temp sensor
     }
 
-
-
-        // 3. Read Calibration Coefficients there are 8 coefficients, c0 and c1 are 12 bits, the rest are 16 bits
-    //int32_t coeffs[9];
+    // 3. Read Calibration Coefficients there are 8 coefficients, c0 and c1 are 12 bits, the rest are 16 bits
     dps368_get_coeff(dev->spi, dev->coeffs);
-
-
-
-    //return;
 }
 
 static int32_t dps368_get_raw_temp(spi_device_handle_t dev){
@@ -195,9 +181,7 @@ float corrected_pressure(dps368_t *dev){
     
     int32_t raw_p = dps368_get_raw_pressure(dev->spi);
     int32_t raw_t = dps368_get_raw_temp(dev->spi);
-    
-    
-    
+
     int32_t *coeffs = dev->coeffs;
     uint32_t kP = 253952;
     uint32_t kT = 253952;
@@ -209,18 +193,20 @@ float corrected_pressure(dps368_t *dev){
     //Pcomp(Pa) = c00 + Praw_sc*(c10 + Praw_sc *(c20+ Praw_sc *c30)) + Traw_sc *c01 +
     //Traw_sc *Praw_sc *(c11+Praw_sc*c21), from datasheet
     float comp_pressure;
-    comp_pressure = coeffs[2] + P_raw_sc*(coeffs[3] + P_raw_sc *(coeffs[6]+ P_raw_sc *coeffs[8]))
-     + T_raw_sc *coeffs[4] + T_raw_sc *P_raw_sc *(coeffs[5]+P_raw_sc*coeffs[7]);
+    comp_pressure = coeffs[2] 
+                    + P_raw_sc*(coeffs[3] + P_raw_sc *(coeffs[6] + P_raw_sc *coeffs[8]))
+                    + T_raw_sc *coeffs[4] 
+                    + T_raw_sc *P_raw_sc *(coeffs[5]+P_raw_sc*coeffs[7]);
     return comp_pressure;
 }
 
-float corrected_temperature(float raw_temp, dps368_t *dev){
+float corrected_temperature(dps368_t *dev){
     //This function takes the raw_temp value and utilizes the coefficients and kT value
     //to correct it per dps368 datasheet, kT for our sample rate is 253952
     int32_t *coeffs = dev->coeffs;
     uint32_t kT = 253952;
     float T_raw_sc;
-    T_raw_sc = raw_temp/kT;
+    T_raw_sc = (float)dps368_get_raw_temp(dev->spi)/kT;
 
     //Tcomp(°C) = c0*0.5 + c1*Traw_sc, from datasheet
     float comp_temp;

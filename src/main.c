@@ -48,8 +48,8 @@ void app_main(void) {
         float corrected_p = corrected_pressure(&pressure_sensor_1);
         printf("Corrected Pressure Value: %d Pa\n", (int)corrected_p);
 
-        //int corrected_t = corrected_temperature(&pressure_sensor_1);
-        //printf("Corrected Temperature Value: %d °C\n", corrected_t);
+        int corrected_t = corrected_temperature(&pressure_sensor_1);
+        printf("Corrected Temperature Value: %d °C\n", corrected_t);
 
         vTaskDelay(pdMS_TO_TICKS(800));
 
