@@ -1,3 +1,4 @@
 {
-    "idf.currentSetup": "D:\\Users\\carld\\esp\\v5.5.1\\esp-idf"
+    "idf.currentSetup": "D:\\Users\\carld\\esp\\v5.5.1\\esp-idf",
+    "idf.pythonInstallPath": "/usr/bin/python3"
 }
