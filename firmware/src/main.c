@@ -37,7 +37,7 @@ void app_main(void) {
         return;
     }
 
-    FILE *f = fopen("/sdcard/data.csv", "w+");
+    FILE *f = sd_log_open("data.txt");
     if (f == NULL) {
         ESP_LOGE("MAIN", "Failed to open file for writing");
         return;
@@ -52,24 +52,18 @@ void app_main(void) {
         dps368_read(dev_sensor1, 0x0D, &dummy, 1); 
         vTaskDelay(pdMS_TO_TICKS(500));
         
-        // 2. Now try the real ID read
-        uint8_t id = 0;
-        dps368_read(dev_sensor1, 0x0D, &id, 1);
-        printf("Device ID: 0x%02X\n", id);
-
         int32_t raw_p = dps368_get_raw_pressure(dev_sensor1);
         int32_t raw_t = dps368_get_raw_temp(dev_sensor1);
         
         // This prints the raw decimal value
         // To get hPa (e.g. 1013.25), you need the calibration coefficients
-        printf("Raw Pressure Value:%" PRId32 "\n", raw_p);
-        printf("Raw Temperature Value:%" PRId32"\n", raw_t);
 
         int corrected_p = corrected_pressure(raw_p, raw_t, coeffs);
-        printf("Corrected Pressure Value: %d Pa\n", corrected_p);
 
         int corrected_t = corrected_temperature(raw_t, coeffs);
-        printf("Corrected Temperature Value: %d °C\n", corrected_t);
+
+        // Log the corrected pressure and temperature to the SD card
+        sd_log_sample((float)corrected_p, (uint32_t)corrected_t);
 
         vTaskDelay(pdMS_TO_TICKS(500));
 
