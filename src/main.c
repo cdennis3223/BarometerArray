@@ -12,46 +12,66 @@
 
 
 void app_main(void) {
+    // 1. Setup SPI
+    spi_device_handle_t dev_sensor1 = NULL;
 
-    //1. SPI Setup
-    spi_device_handle_t spi_handle_1;
-     if (spi_bus_init(&spi_handle_1) != ESP_OK) {
+    if (spi_bus_init(&dev_sensor1) != ESP_OK) {
         ESP_LOGE("MAIN", "SPI Init Failed");
         return;
     }
-    
-    //2. DPS368 sensor setup
-    dps368_t pressure_sensor_1;
-    dps368_init(&pressure_sensor_1, spi_handle_1);
 
+    // 2. Initialize the sensor
+    dps368_init(dev_sensor1);
 
+    // 3. Read Calibration Coefficients there are 8 coefficients, c0 and c1 are 12 bits, the rest are 16 bits
+    uint8_t check;
+    check = (dps368_read(dev_sensor1, 0x08, &check, 1) & 0x80);//ensures coefficients are ready to read
+    if (check == 0x80) {
+        int32_t coeffs[9];
+        dps368_get_coeff(dev_sensor1, coeffs);
+    }
+
+    //4. Setup file for reading and writing to SD card
+     if (sd_init() != ESP_OK) {
+        ESP_LOGE("MAIN", "SD Card Init Failed");
+        return;
+    }
+
+    FILE *f = fopen("/sdcard/data.csv", "w+");
+    if (f == NULL) {
+        ESP_LOGE("MAIN", "Failed to open file for writing");
+        return;
+    }
+
+    fprintf(f, "Corrected Pressure (Pa),Corrected Temperature (°C)\n");
 
     while(1) {
 
         // 1. Force a "Wake up" by reading a random register twice
-        //uint8_t dummy;
-        //dps368_read(pressure_sensor_1.spi, 0x0D, &dummy, 1); 
-        //vTaskDelay(pdMS_TO_TICKS(500));
+        uint8_t dummy;
+        dps368_read(dev_sensor1, 0x0D, &dummy, 1); 
+        vTaskDelay(pdMS_TO_TICKS(500));
         
         // 2. Now try the real ID read
-        //uint8_t id = 0;
-        //dps368_read(dev_sensor1, 0x0D, &id, 1);
-        //printf("Device ID: 0x%02X\n", id);
+        uint8_t id = 0;
+        dps368_read(dev_sensor1, 0x0D, &id, 1);
+        printf("Device ID: 0x%02X\n", id);
 
-        
+        int32_t raw_p = dps368_get_raw_pressure(dev_sensor1);
+        int32_t raw_t = dps368_get_raw_temp(dev_sensor1);
         
         // This prints the raw decimal value
         // To get hPa (e.g. 1013.25), you need the calibration coefficients
-        //printf("Raw Pressure Value:%" PRId32 "\n", raw_p);
-        //printf("Raw Temperature Value:%" PRId32"\n", raw_t);
+        printf("Raw Pressure Value:%" PRId32 "\n", raw_p);
+        printf("Raw Temperature Value:%" PRId32"\n", raw_t);
 
-        float corrected_p = corrected_pressure(&pressure_sensor_1);
-        printf("Corrected Pressure Value: %d Pa\n", (int)corrected_p);
+        int corrected_p = corrected_pressure(raw_p, raw_t, coeffs);
+        printf("Corrected Pressure Value: %d Pa\n", corrected_p);
 
-        int corrected_t = corrected_temperature(&pressure_sensor_1);
+        int corrected_t = corrected_temperature(raw_t, coeffs);
         printf("Corrected Temperature Value: %d °C\n", corrected_t);
 
-        vTaskDelay(pdMS_TO_TICKS(800));
+        vTaskDelay(pdMS_TO_TICKS(500));
 
         
     
