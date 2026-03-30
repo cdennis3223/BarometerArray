@@ -119,15 +119,17 @@ void dps368_init(dps368_t *dev, spi_device_handle_t spi_handle) {
     dps368_write(dev->spi, 0x08, 0x07);
     dps368_write(dev->spi, 0x09, 0x0C); // Set CFG_REG to allow pressure/temp shift
 
-    //check the temp sensor source, bit 7 of 0x28
+    //check the temp sensor source, bit 7 of COEF_STCE(0x28)
+    //necessary to check temp sensor source for coefficient correction
     uint8_t temp_source;
     temp_source = dps368_read(dev->spi, 0x28, &temp_source, 1) & 0x80;
 
-    //Configure pressure and temperature measurement OSR(OverSampling Rate),
-    //bits 4,5,6 set rate, bits 0-3 set the OSR, bit 7 in 0x07 sets temp sensor source
-    //necessary to check temp sensor source for coefficient correction
-    dps368_write(dev->spi, 0x06, 0x14); // Set pressure OSR to 16
+    //Configure pressure register PRS_CFG(0x06)
+    //bits 4-6   set pressure measurement rate.         Currently set to 0b0101 or 0x5, measurement rate of 32Hz
+    //bits 0-3   set the pressure oversampling rate.    Currently set to 0b0100 or 0x4, oversample rate of 16
+    dps368_write(dev->spi, 0x06, 0x54); // Set pressure OSR to 16
     
+    //bit 7 in 0x07 sets temp sensor source
     if(temp_source == 0){
         dps368_write(dev->spi, 0x07, 0x94); // Set temperature OSR to 16 and use external temp sensor
     }
@@ -138,6 +140,7 @@ void dps368_init(dps368_t *dev, spi_device_handle_t spi_handle) {
     // 3. Read Calibration Coefficients there are 8 coefficients, c0 and c1 are 12 bits, the rest are 16 bits
     dps368_get_coeff(dev->spi, dev->coeffs);
 }
+
 
 static int32_t dps368_get_raw_temp(spi_device_handle_t dev){
     uint8_t raw_data[3];

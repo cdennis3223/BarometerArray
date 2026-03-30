@@ -1,0 +1,80 @@
+#include "collate.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_timer.h"
+#include <stdlib.h>
+
+typedef struct {
+    ring_buffer_t *rb;
+    dps368_t *dev;
+    uint32_t period_ms;
+} collate_task_args_t;
+
+static inline int next_index(int index) {
+    return (index + 1) % BUFFER_SIZE;
+}
+
+void ring_buffer_init(ring_buffer_t *rb) {
+    rb->head = 0;
+    rb->tail = 0;
+}
+
+void ring_buffer_push(ring_buffer_t *rb, sample_t s) {
+    int next = next_index(rb->head);
+
+    if (next == rb->tail) {
+        // buffer full, overwrite oldest
+        rb->tail = next_index(rb->tail);
+    }
+
+    rb->buffer[rb->head] = s;
+    rb->head = next;
+}
+
+bool ring_buffer_pop(ring_buffer_t *rb, sample_t *s) {
+    if (rb->head == rb->tail) {
+        return false;
+    }
+
+    *s = rb->buffer[rb->tail];
+    rb->tail = next_index(rb->tail);
+    return true;
+}
+
+bool ring_buffer_peek_latest(ring_buffer_t *rb, sample_t *s) {
+    if (rb->head == rb->tail) {
+        return false;
+    }
+
+    int latest = (rb->head - 1 + BUFFER_SIZE) % BUFFER_SIZE;
+    *s = rb->buffer[latest];
+    return true;
+}
+
+static void collate_task(void *arg) {
+    collate_task_args_t *ctx = (collate_task_args_t *)arg;
+
+    while (1) {
+        sample_t s;
+        s.pressure = corrected_pressure(ctx->dev);
+        s.temperature = corrected_temperature(ctx->dev);
+        s.timestamp_ms = (uint32_t)(esp_timer_get_time() / 1000ULL);
+
+        ring_buffer_push(ctx->rb, s);
+
+        vTaskDelay(pdMS_TO_TICKS(ctx->period_ms));
+    }
+}
+
+void collate_start_task(ring_buffer_t *rb, dps368_t *dev, uint32_t period_ms) {
+    collate_task_args_t *args = malloc(sizeof(collate_task_args_t));
+    if (args == NULL) {
+        return;
+    }
+
+    args->rb = rb;
+    args->dev = dev;
+    args->period_ms = period_ms;
+
+    xTaskCreate(collate_task, "collate_task", 4096, args, 5, NULL);
+}
