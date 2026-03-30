@@ -8,7 +8,8 @@
 #define SDA_GPIO        21
 #define SCL_GPIO        22
 
-
+void button_init(void);
+void button_task(void *arg);
 void sh1107_init(void);
 void sh1107_clear(void);
 void sh1107_print_horizontal(uint8_t col, uint8_t page, const char *str);

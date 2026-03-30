@@ -3,6 +3,8 @@
 #include "driver/i2c_master.h"
 #include "esp_log.h"
 #include <string.h>
+#include "screen.h"
+#include "esp_timer.h"
 
 static const char *TAG = "screen.c";
 
@@ -14,6 +16,74 @@ static const char *TAG = "screen.c";
 
 static i2c_master_bus_handle_t bus_handle;
 static i2c_master_dev_handle_t dev_handle;
+
+#include "driver/gpio.h"
+
+#define BUTTON_GPIO GPIO_NUM_4  // choose your pin
+
+void button_init(void)
+{
+    gpio_config_t io_conf = {
+        .pin_bit_mask = (1ULL << BUTTON_GPIO),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE
+    };
+
+    gpio_config(&io_conf);
+}
+
+
+//responds to botton task and cycles through readouts
+void button_task(void *arg)
+{
+    button_init();
+
+    int state = 0;
+
+    bool last = false;
+    int64_t last_change_time = 0;
+    const int debounce_ms = 20;
+
+    // Initial display
+    sh1107_clear();
+    sh1107_print_horizontal(0,15,"...");
+
+    while (1) {
+        bool current = (gpio_get_level(BUTTON_GPIO) == 0); // active LOW
+        int64_t now = esp_timer_get_time();
+
+        // Debounce: only accept change if stable for 20 ms
+        if (current != last) {
+            if ((now - last_change_time) > debounce_ms * 1000) {
+
+                // Detect press event (edge)
+                if (current == true) {
+                    state = (state + 1) % 3;
+
+                    sh1107_clear();
+
+                    if (state == 0) {
+                        sh1107_print_horizontal(0,15,"SPARTA!");
+                    } else if (state == 1) {
+                        sh1107_print_horizontal(0,15,"THIS");
+                    } else if (state == 2) {
+                        sh1107_print_horizontal(0,15, "IS");
+                    }
+                }
+
+                last = current;
+                last_change_time = now;
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+
+//=========================================================================
 
 // Column-major 5x7 font for SH1107 horizontal printing
 static const uint8_t font5x7_col[95][5] = {
