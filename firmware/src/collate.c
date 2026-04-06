@@ -3,6 +3,7 @@
 #include "freertos/task.h"
 #include "esp_timer.h"
 #include <stdlib.h>
+#include "GPS.h"
 
 typedef struct {
     ring_buffer_t *rb;
@@ -53,6 +54,7 @@ bool ring_buffer_peek_latest(ring_buffer_t *rb, sample_t *s) {
 
 static void collate_task(void *arg) {
     collate_task_args_t *ctx = (collate_task_args_t *)arg;
+    int64_t last_print_us = 0;
 
     while (1) {
         sample_t s;
@@ -60,7 +62,31 @@ static void collate_task(void *arg) {
         s.temperature = corrected_temperature(ctx->dev);
         s.timestamp_ms = (uint32_t)(esp_timer_get_time() / 1000ULL);
 
+        int64_t now = esp_timer_get_time();
+
+
+        if (gps_time.valid) {
+            int64_t delta = now - gps_time.local_sync_us;
+            uint64_t utc_us = gps_time.utc_sync_us + delta;
+            s.timestamp_ms = (uint32_t)(utc_us / 1000ULL);
+
+        } else {
+            s.timestamp_ms = (uint32_t)(now / 1000ULL);
+        }
+
+
         ring_buffer_push(ctx->rb, s);
+
+        if ((now - last_print_us) >= 3000000) {
+            sample_t latest;
+        if (ring_buffer_peek_latest(ctx->rb, &latest)) {
+            printf("latest: pressure=%.2f temp=%.2f timestamp_ms=%lu\n",
+                latest.pressure,
+                latest.temperature,
+                (unsigned long)latest.timestamp_ms);
+        }
+        last_print_us = now;
+        }
 
         vTaskDelay(pdMS_TO_TICKS(ctx->period_ms));
     }
