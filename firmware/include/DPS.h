@@ -3,10 +3,11 @@
 #include "driver/spi_master.h"
 
 // Your existing pin definitions
-#define PIN_NUM_MISO 12
-#define PIN_NUM_MOSI 13
-#define PIN_NUM_CLK  14
-#define PIN_NUM_CS1  15
+#define PIN_NUM_MISO 46
+#define PIN_NUM_MOSI 3
+#define PIN_NUM_CLK  9
+#define PIN_NUM_CS1  8
+#define PIN_NUM_CS2  18
 
 typedef struct{
     spi_device_handle_t spi;

@@ -4,13 +4,13 @@
 #include "driver/gpio.h"
 
 //Define all GPIO pins for SD Card
-#define SD_CLK_PIN 6
+#define SD_CLK_PIN 15
 #define SD_CMD_PIN 7
 #define SD_D0_PIN 4
-#define SD_D1_PIN 5
-#define SD_D2_PIN 8
-#define SD_D3_PIN 9
-#define DETECT_PIN 10
+#define SD_D1_PIN 6
+#define SD_D2_PIN 17
+#define SD_D3_PIN 16
+#define DETECT_PIN 5
 
 #define MOUNT_POINT "/sdcard"
 

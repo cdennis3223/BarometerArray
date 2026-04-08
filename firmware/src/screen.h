@@ -5,8 +5,9 @@
 
 #define I2C_MASTER_NUM  I2C_NUM_0
 #define SH1107_ADDR     0x3C
-#define SDA_GPIO        21
-#define SCL_GPIO        22
+#define SDA_GPIO        12
+#define SCL_GPIO        11
+#define BUTTON          10 
 
 void button_init(void);
 void button_task(void *arg);
