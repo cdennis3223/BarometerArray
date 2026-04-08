@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "driver/i2c_master.h"
 #include "driver/i2c_slave.h"
+#include <string.h>
 
 i2c_master_bus_handle_t bus_handle;
 i2c_master_dev_handle_t dev_handle;
