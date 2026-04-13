@@ -5,23 +5,16 @@
 #include <string.h>
 #include "screen.h"
 #include "esp_timer.h"
+#include "driver/gpio.h"
+#include "driver/i2c.h"
 
 static const char *TAG = "screen.c";
-
-#define I2C_SDA_PIN 21
-#define I2C_SCL_PIN 22
-#define I2C_NUM I2C_NUM_0
-#define SH1107_ADDR 0x3C
-
 
 static i2c_master_bus_handle_t bus_handle;
 static i2c_master_dev_handle_t dev_handle;
 
-#include "driver/gpio.h"
 
-#define BUTTON_GPIO GPIO_NUM_4  // choose your pin
-
-void button_init(void)
+static void button_init(void)
 {
     gpio_config_t io_conf = {
         .pin_bit_mask = (1ULL << BUTTON_GPIO),
@@ -34,53 +27,6 @@ void button_init(void)
     gpio_config(&io_conf);
 }
 
-
-//responds to botton task and cycles through readouts
-void button_task(void *arg)
-{
-    button_init();
-
-    int state = 0;
-
-    bool last = false;
-    int64_t last_change_time = 0;
-    const int debounce_ms = 20;
-
-    // Initial display
-    sh1107_clear();
-    sh1107_print_horizontal(0,15,"...");
-
-    while (1) {
-        bool current = (gpio_get_level(BUTTON_GPIO) == 0); // active LOW
-        int64_t now = esp_timer_get_time();
-
-        // Debounce: only accept change if stable for 20 ms
-        if (current != last) {
-            if ((now - last_change_time) > debounce_ms * 1000) {
-
-                // Detect press event (edge)
-                if (current == true) {
-                    state = (state + 1) % 3;
-
-                    sh1107_clear();
-
-                    if (state == 0) {
-                        sh1107_print_horizontal(0,15,"SPARTA!");
-                    } else if (state == 1) {
-                        sh1107_print_horizontal(0,15,"THIS");
-                    } else if (state == 2) {
-                        sh1107_print_horizontal(0,15, "IS");
-                    }
-                }
-
-                last = current;
-                last_change_time = now;
-            }
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
-}
 
 
 //=========================================================================
@@ -185,7 +131,6 @@ static const uint8_t font5x7_col[95][5] = {
 };
 
 // --- Low level I2C ---
-
 static void send_cmd(uint8_t cmd)
 {
     uint8_t buf[2] = {0x00, cmd};
@@ -201,8 +146,7 @@ static void send_data(uint8_t *data, size_t len)
 }
 
 // --- SH1107 driver ---
-
-void sh1107_init(void)
+static void sh1107_init(void)
 {
        // Init I2C bus
     i2c_master_bus_config_t bus_config = {
@@ -252,7 +196,7 @@ void sh1107_init(void)
     vTaskDelay(pdMS_TO_TICKS(100));
 }
 
-void sh1107_clear(void)
+static void sh1107_clear(void)
 {
     uint8_t blank[128];
     memset(blank, 0x00, 128);
@@ -266,7 +210,7 @@ void sh1107_clear(void)
 }
 
 
-void sh1107_print_horizontal(uint8_t col, uint8_t page, const char *str) {
+static void sh1107_print_horizontal(uint8_t col, uint8_t page, const char *str) {
     while (*str) {
         char c = *str++;
         if (c < 32 || c > 126) c = 32;
@@ -292,5 +236,53 @@ void sh1107_print_horizontal(uint8_t col, uint8_t page, const char *str) {
 
         page -= 1;
         if (page >= 16) break;
+    }
+}
+
+//==UI Interface Task=================================================================================================
+//responds to botton task and cycles through readouts
+void button_task(void *arg)
+{
+    button_init();
+    sh1107_init();
+
+    int state = 0;
+    bool last = false;
+    int64_t last_change_time = 0;
+    const int debounce_ms = 20;
+
+    // Initial display
+    sh1107_clear();
+    sh1107_print_horizontal(0,15,"...");
+
+    while (1) {
+        bool current = (gpio_get_level(BUTTON_GPIO) == 0); // active LOW
+        int64_t now = esp_timer_get_time();
+
+        // Debounce: only accept change if stable for 20 ms
+        if (current != last) {
+            if ((now - last_change_time) > debounce_ms * 1000) {
+
+                // Detect press event (edge)
+                if (current == true) {
+                    state = (state + 1) % 3;
+
+                    sh1107_clear();
+
+                    if (state == 0) {
+                        sh1107_print_horizontal(0,15,"Besame!");
+                    } else if (state == 1) {
+                        sh1107_print_horizontal(0,15,"Puto");
+                    } else if (state == 2) {
+                        sh1107_print_horizontal(0,15, "Mwah");
+                    }
+                }
+
+                last = current;
+                last_change_time = now;
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
