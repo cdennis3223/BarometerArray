@@ -270,11 +270,12 @@ void button_task(void *arg)
                     sh1107_clear();
 
                     if (state == 0) {
-                        sh1107_print_horizontal(0,15,"Besame!");
+                        sh1107_print_horizontal(0,15,"PRESSURE:");
+                        sh1107_print_horizontal(20,15,"TEMPERATURE:");
                     } else if (state == 1) {
-                        sh1107_print_horizontal(0,15,"Puto");
+                        sh1107_print_horizontal(0,15,"GPS DATA:");
                     } else if (state == 2) {
-                        sh1107_print_horizontal(0,15, "Mwah");
+                        sh1107_print_horizontal(0,15,"SD CARD STATUS:");
                     }
                 }
 
