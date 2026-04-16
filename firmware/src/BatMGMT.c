@@ -1,69 +1,118 @@
 #include "driver/gpio.h"
 #include "BatMGMT.h"
-#include "esp_log.h"
 #include "driver/i2c_master.h"
-#include "driver/i2c_slave.h"
+#include <stdio.h>
 #include <string.h>
 
-i2c_master_bus_handle_t bus_handle;
-i2c_master_dev_handle_t dev_handle;
+static i2c_master_bus_handle_t bus_handle;
+static i2c_master_dev_handle_t dev_handle;
 
-
-esp_err_t BatMGMT_init(void) {
-    
-    i2c_master_bus_config_t i2c_mst_config = {
-    .clk_source = I2C_CLK_SRC_DEFAULT,
-    .i2c_port = -1,//auto select
-    .scl_io_num = I2C_MASTER_SCL,
-    .sda_io_num = I2C_MASTER_SDA,
-    .glitch_ignore_cnt = 7,
-    .flags.enable_internal_pullup = true,
+esp_err_t BatMGMT_init(void)
+{
+    i2c_master_bus_config_t bus_config = {
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .i2c_port = I2C_NUM,
+        .scl_io_num = I2C_MASTER_SCL,
+        .sda_io_num = I2C_MASTER_SDA,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
     };
 
-    ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_mst_config, &bus_handle));
+    esp_err_t err = i2c_new_master_bus(&bus_config, &bus_handle);
+    if (err != ESP_OK) {
+        printf("BatMGMT: i2c_new_master_bus failed: %s\n", esp_err_to_name(err));
+        return err;
+    }
 
-    i2c_device_config_t dev_cfg = {
-    .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-    .device_address = 0x6D, //0x6C is write for the battery management chip, 0x6D is read
-    .scl_speed_hz = 400000,
+    i2c_device_config_t dev_config = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = BATMGMT_ADDR,
+        .scl_speed_hz = 100000,
     };
 
-    ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_cfg, &dev_handle));
+    err = i2c_master_bus_add_device(bus_handle, &dev_config, &dev_handle);
+    if (err != ESP_OK) {
+        printf("BatMGMT: i2c_master_bus_add_device failed: %s\n", esp_err_to_name(err));
+        return err;
+    }
 
+    printf("BatMGMT: Battery management IC initialized\n");
     return ESP_OK;
 }
 
-static void send_cmd(uint8_t cmd, uint8_t addr)
+static esp_err_t BatMGMT_read16(uint8_t reg, uint16_t *value)
 {
-    uint8_t buf[3] = {0x00, cmd, addr};
-    i2c_master_transmit(dev_handle, buf, 3, 100);
+    uint8_t buf[2] = {0};
+
+    esp_err_t err = i2c_master_transmit_receive(dev_handle, &reg, 1, buf, 2, 100);
+    if (err != ESP_OK) {
+        printf("BatMGMT: Read reg 0x%02X failed: %s\n", reg, esp_err_to_name(err));
+        return err;
+    }
+
+    *value = ((uint16_t)buf[0] << 8) | buf[1];
+    return ESP_OK;
 }
 
-static void send_data(uint8_t *data, size_t len)
+static esp_err_t BatMGMT_write16(uint8_t reg, uint16_t value)
 {
-    uint8_t buf[len + 1];
-    buf[0] = 0x40;
-    memcpy(buf + 1, data, len);
-    i2c_master_transmit(dev_handle, buf, len + 1, 100);
+    uint8_t buf[3];
+    buf[0] = reg;
+    buf[1] = (uint8_t)(value >> 8);
+    buf[2] = (uint8_t)(value & 0xFF);
+
+    esp_err_t err = i2c_master_transmit(dev_handle, buf, 3, 100);
+    if (err != ESP_OK) {
+        printf("BatMGMT: Write reg 0x%02X failed: %s\n", reg, esp_err_to_name(err));
+    }
+    return err;
 }
 
-static void BatMGMT_read(uint8_t reg, uint16_t *value){
-    //read data from the battery management chip and print it to the console
-    //SOC is read from REG 0x04, Direct voltage is from REG 0x02
-    //Send 0x6D to read from device
-    uint8_t buf[2];
+void BatMGMT_clearRI(void)
+{
+    uint16_t status = 0;
 
-    i2c_master_transmit_receive(dev_handle, &reg, 1, buf, 2, 100);
-    *value = (buf[0] << 8) | buf[1];
+    if (BatMGMT_read16(0x1A, &status) != ESP_OK) {
+        printf("BatMGMT: Failed to read STATUS before clearing RI\n");
+        return;
+    }
 
+    printf("BatMGMT: STATUS before clear RI = 0x%04X\n", status);
+
+    // Only clear RI in the upper byte. Do not trust or manipulate the low byte.
+    uint16_t new_status = status & 0xFE00;
+
+    if (BatMGMT_write16(0x1A, new_status) != ESP_OK) {
+        printf("BatMGMT: Failed to write STATUS to clear RI\n");
+        return;
+    }
+
+    if (BatMGMT_read16(0x1A, &status) != ESP_OK) {
+        printf("BatMGMT: Failed to verify STATUS after clearing RI\n");
+        return;
+    }
+
+    printf("BatMGMT: STATUS after clear RI  = 0x%04X\n", status);
 }
 
-void BatMGMT_readSOC(void){
-    uint8_t buf[2];
-    BatMGMT_read(0x04, (uint16_t *)buf);
-    uint16_t raw_soc = (buf[0] << 8) | buf[1];
-    float soc = raw_soc / 256.0;
-    ESP_LOGI("BatMGMT", "State of Charge: %.2f%%", soc);
+float BatMGMT_readSOC(void)
+{
+    uint16_t raw_soc = 0;
+
+    if (BatMGMT_read16(0x04, &raw_soc) != ESP_OK) {
+        return -1.0f;
+    }
+
+    return raw_soc / 256.0f;
 }
 
+float BatMGMT_readVoltage(void)
+{
+    uint16_t raw_vcell = 0;
 
+    if (BatMGMT_read16(0x02, &raw_vcell) != ESP_OK) {
+        return -1.0f;
+    }
+
+    return raw_vcell * 78.125e-6f;
+}

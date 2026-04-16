@@ -74,16 +74,20 @@ esp_err_t sd_log_open(const char *name)
         ESP_LOGE("SD", "fopen failed %s (errno=%d: %s)", path, errno, strerror(errno));
         return ESP_FAIL;
     }
+    fprintf(g_f,"Pressure(hPa), Temperature(C), Time(UTC), Battery Voltage(V)\n");
+    fflush(g_f);
     return ESP_OK;
 }
 
-esp_err_t sd_log_sample(float p_pa, uint32_t t_c)
+esp_err_t sd_log_sample(float p_pa, uint32_t t_c, float time, float Voltage)
 {
     if (!g_f) return ESP_ERR_INVALID_STATE;
 
-    int n = fprintf(g_f, "%.6f,%lu\n",
+    int n = fprintf(g_f, "%.6f,%lu,%.4f,%.2f\n",
                 (double)p_pa,
-                (unsigned long)t_c);
+                (unsigned long)t_c,
+                (float) time,
+                (float) Voltage);
 
     if (n <= 0) {
         ESP_LOGE("SD", "fprintf failed (errno=%d: %s)", errno, strerror(errno));

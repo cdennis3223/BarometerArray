@@ -20,6 +20,6 @@ esp_err_t sd_deinit(void);
 
 esp_err_t sd_log_open(const char *name);
 
-esp_err_t sd_log_sample(float p_pa, uint32_t t_c);
+esp_err_t sd_log_sample(float p_pa, uint32_t t_c, float time, float Voltage);
 
 void sd_log_close(void);
