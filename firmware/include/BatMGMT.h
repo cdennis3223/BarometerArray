@@ -6,3 +6,7 @@
 #define I2C_MASTER_SCL 41
 #define I2C_MASTER_SDA 42
 #define MAX_ALERT 40
+
+void BatMGMT_init(void);
+float BatMGMT_readVoltage(void);
+float BatMGMT_readSOC(void);

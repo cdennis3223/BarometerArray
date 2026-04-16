@@ -4,6 +4,7 @@
 #include "esp_timer.h"
 #include <stdlib.h>
 #include "GPS.h"
+#include "BatMGMT.h"
 
 typedef struct {
     ring_buffer_t *rb;
@@ -61,6 +62,8 @@ static void collate_task(void *arg) {
         s.pressure = corrected_pressure(ctx->dev);
         s.temperature = corrected_temperature(ctx->dev);
         s.timestamp_ms = (uint32_t)(esp_timer_get_time() / 1000ULL);
+        s.voltage = BatMGMT_readVoltage();
+        s.soc = BatMGMT_readSOC();
 
         int64_t now = esp_timer_get_time();
 
@@ -80,10 +83,12 @@ static void collate_task(void *arg) {
         if ((now - last_print_us) >= 3000000) {
             sample_t latest;
         if (ring_buffer_peek_latest(ctx->rb, &latest)) {
-            printf("latest: pressure=%.2f temp=%.2f timestamp_ms=%lu\n",
+            printf("latest: pressure=%.2f temp=%.2f timestamp_ms=%lu voltage=%.2f soc=%.2f\n",
                 latest.pressure,
                 latest.temperature,
-                (unsigned long)latest.timestamp_ms);
+                (unsigned long)latest.timestamp_ms,
+                latest.voltage,
+                latest.soc);
         }
         last_print_us = now;
         }

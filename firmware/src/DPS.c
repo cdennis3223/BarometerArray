@@ -131,10 +131,10 @@ void dps368_init(dps368_t *dev, spi_device_handle_t spi_handle) {
     
     //bit 7 in 0x07 sets temp sensor source
     if(temp_source == 0){
-        dps368_write(dev->spi, 0x07, 0x94); // Set temperature OSR to 16 and use external temp sensor
+        dps368_write(dev->spi, 0x07, 0xD4); // Set temperature OSR to 16 and use external temp sensor at 32Hz
     }
     else{
-        dps368_write(dev->spi, 0x07, 0x14); // Set temperature OSR to 16 and use internal temp sensor
+        dps368_write(dev->spi, 0x07, 0x54); // Set temperature OSR to 16 and use internal temp sensor at 32Hz
     }
 
     // 3. Read Calibration Coefficients there are 8 coefficients, c0 and c1 are 12 bits, the rest are 16 bits
