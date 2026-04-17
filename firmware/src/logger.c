@@ -6,7 +6,7 @@ void logger_task(void *args) {
     while (1) {
         sample_t s;
         if (ring_buffer_pop(rb, &s)) {
-            sd_log_sample(s.pressure, s.temperature, s.timestamp_ms, s.Voltage, s.SOC, s.seq);
+            sd_log_sample(s.pressure, s.temperature, s.timestamp_ms, s.Voltage, s.seq);
         } else {
             vTaskDelay(pdMS_TO_TICKS(500)); // Sleep briefly if no data
         }
