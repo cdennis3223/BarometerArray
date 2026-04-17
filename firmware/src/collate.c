@@ -69,8 +69,8 @@ static void collate_task(void *arg) {
         s.seq = seq++;
         s.pressure = corrected_pressure(ctx->dev);
         s.temperature = corrected_temperature(ctx->dev);
-        s.voltage = BatMGMT_get_voltage();
-        s.soc = BatMGMT_get_soc();
+        s.voltage = BatMGMT_readVoltage();
+        s.soc = BatMGMT_readSOC();
 
         int64_t now = esp_timer_get_time();
 
