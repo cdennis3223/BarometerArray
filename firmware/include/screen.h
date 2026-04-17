@@ -5,7 +5,7 @@
 #define I2C_SDA_PIN 12
 #define I2C_SCL_PIN 11
 #define BUTTON_GPIO 10
-#define I2C_NUM I2C_NUM_0
+#define I2C_NUM I2C_NUM_1
 #define SH1107_ADDR 0x3C
 
 //Performs Initialization and then endlessly cycles through readout options

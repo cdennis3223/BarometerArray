@@ -56,14 +56,10 @@ bool ring_buffer_peek_latest(ring_buffer_t *rb, sample_t *s) {
 static void collate_task(void *arg) {
     collate_task_args_t *ctx = (collate_task_args_t *)arg;
 
-    const TickType_t period_ticks = pdMS_TO_TICKS(ctx->period_ms);
-    TickType_t last_wake = xTaskGetTickCount();
-
     int64_t last_print_us = 0;
     uint32_t seq = 0;
 
     while (1) {
-        vTaskDelayUntil(&last_wake, period_ticks);
 
         sample_t s = {0};
         s.seq = seq++;
@@ -101,7 +97,7 @@ static void collate_task(void *arg) {
         last_print_us = now;
         }
 
-        //vTaskDelay(pdMS_TO_TICKS(ctx->period_ms));
+        vTaskDelay(pdMS_TO_TICKS(ctx->period_ms));
         
     }
 }
