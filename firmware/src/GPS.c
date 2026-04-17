@@ -9,10 +9,24 @@
 #include "GPS.h"
 #include "GPS_parser.h"
 #include "esp_timer.h"
+#include "freertos/portmacro.h"
 
 static const char *TAG = "GPS";
 
 gps_time_sync_t gps_time = {0};
+gps_display_data_t gps_display_data = {0};
+static portMUX_TYPE gps_data_lock = portMUX_INITIALIZER_UNLOCKED;
+
+void gps_get_display_data(gps_display_data_t *out)
+{
+    if (!out) {
+        return;
+    }
+
+    portENTER_CRITICAL(&gps_data_lock);
+    *out = gps_display_data;
+    portEXIT_CRITICAL(&gps_data_lock);
+}
 
 void gps_uart_init(void)
 {
@@ -96,6 +110,14 @@ void gps_task(void *arg)
                         gps_time.utc_sync_us = (uint64_t)sec * 1000000ULL;
                         gps_time.local_sync_us = esp_timer_get_time();
                         gps_time.valid = true;
+
+                        portENTER_CRITICAL(&gps_data_lock);
+                        gps_display_data.latitude = data.rmc.lat;
+                        gps_display_data.longitude = data.rmc.lon;
+                        strncpy(gps_display_data.utc_time, data.rmc.time, sizeof(gps_display_data.utc_time) - 1);
+                        gps_display_data.utc_time[sizeof(gps_display_data.utc_time) - 1] = '\0';
+                        gps_display_data.valid = true;
+                        portEXIT_CRITICAL(&gps_data_lock);
 
                         //printf("RMC: %s %s (%u sec)\n",
                             //data.rmc.date,

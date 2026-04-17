@@ -48,7 +48,6 @@ void app_main(void)
 
     xTaskCreate(button_task, "button", 4096, NULL, 1, NULL);
 
-   /*
     xTaskCreate(
         gps_task,
         "gps_task",
@@ -56,8 +55,7 @@ void app_main(void)
         NULL,
         5,
         NULL
-    );*/
+    );
     
     
 }
-
