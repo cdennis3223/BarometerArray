@@ -13,6 +13,7 @@ idf_component_register(
         "GPS_parser.c"
         "screen.c"
         "BatMGMT.c"
+        "logger.c"
     INCLUDE_DIRS
         "."
         "../include"

@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
-//static i2c_master_bus_handle_t bus_handle;
+static i2c_master_bus_handle_t bus_handle;
 static i2c_master_dev_handle_t dev_handle;
 
 esp_err_t BatMGMT_init(void)
