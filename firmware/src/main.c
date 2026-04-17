@@ -14,13 +14,14 @@
 #include "collate.h"
 #include "screen.h"
 #include "SD.h"
+#include "BatMGMT.h"
 
 static const char *TAG = "MAIN";
 
 
-//static spi_device_handle_t spi_handle;
-//static dps368_t dps;
-//static ring_buffer_t pressure_buffer;
+static spi_device_handle_t spi_handle;
+static dps368_t dps;
+static ring_buffer_t pressure_buffer;
 
 
 void app_main(void)
@@ -28,9 +29,10 @@ void app_main(void)
     vTaskDelay(pdMS_TO_TICKS(3000));
     printf("HELLO FROM APP_MAIN\n");
 
-
-    /*
     gps_uart_init();
+    BatMGMT_init();
+    SD_init();
+
 
     ring_buffer_init(&pressure_buffer);
 
@@ -63,7 +65,6 @@ void app_main(void)
 
     ret = sd_log_sample(420.69f, 666);
     printf("sd_log_sample returned: %s\n", esp_err_to_name(ret));
-    */
 
     //sh1107_init();
     xTaskCreate(button_task, "button", 4096, NULL, 5, NULL);

@@ -7,9 +7,13 @@
 #define BUFFER_SIZE 256
 
 typedef struct {
+    uint32_t seq;
+    uint32_t dt_ms;
     float pressure;
     float temperature;
     uint32_t timestamp_ms;
+    float Voltage;
+    float SOC;
 } sample_t;
 
 typedef struct {

@@ -79,11 +79,12 @@ esp_err_t sd_log_open(const char *name)
     return ESP_OK;
 }
 
-esp_err_t sd_log_sample(float p_pa, uint32_t t_c, float time, float Voltage)
+esp_err_t sd_log_sample(float p_pa, uint32_t t_c, float time, float Voltage, uint32_t seq)
 {
     if (!g_f) return ESP_ERR_INVALID_STATE;
 
-    int n = fprintf(g_f, "%.6f,%lu,%.4f,%.2f\n",
+    int n = fprintf(g_f, "%lu,%.6f,%lu,%.4f,%.2f\n",
+                (unsigned long)seq,
                 (double)p_pa,
                 (unsigned long)t_c,
                 (float) time,

@@ -55,15 +55,22 @@ bool ring_buffer_peek_latest(ring_buffer_t *rb, sample_t *s) {
 
 static void collate_task(void *arg) {
     collate_task_args_t *ctx = (collate_task_args_t *)arg;
+
+    const TickType_t period_ticks = pdMS_TO_TICKS(ctx->period_ms);
+    TickType_t last_wake = xTaskGetTickCount();
+
     int64_t last_print_us = 0;
+    uint32_t seq = 0;
 
     while (1) {
-        sample_t s;
+        vTaskDelayUntil(&last_wake, period_ticks);
+
+        sample_t s = {0};
+        s.seq = seq++;
         s.pressure = corrected_pressure(ctx->dev);
         s.temperature = corrected_temperature(ctx->dev);
-        s.timestamp_ms = (uint32_t)(esp_timer_get_time() / 1000ULL);
-        s.voltage = BatMGMT_readVoltage();
-        s.soc = BatMGMT_readSOC();
+        s.voltage = BatMGMT_get_voltage();
+        s.soc = BatMGMT_get_soc();
 
         int64_t now = esp_timer_get_time();
 
@@ -80,6 +87,7 @@ static void collate_task(void *arg) {
 
         ring_buffer_push(ctx->rb, s);
 
+        /*
         if ((now - last_print_us) >= 3000000) {
             sample_t latest;
         if (ring_buffer_peek_latest(ctx->rb, &latest)) {
@@ -94,6 +102,7 @@ static void collate_task(void *arg) {
         }
 
         vTaskDelay(pdMS_TO_TICKS(ctx->period_ms));
+        */
     }
 }
 
