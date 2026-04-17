@@ -87,7 +87,7 @@ static void collate_task(void *arg) {
 
         ring_buffer_push(ctx->rb, s);
 
-        /*
+        
         if ((now - last_print_us) >= 3000000) {
             sample_t latest;
         if (ring_buffer_peek_latest(ctx->rb, &latest)) {
@@ -95,14 +95,14 @@ static void collate_task(void *arg) {
                 latest.pressure,
                 latest.temperature,
                 (unsigned long)latest.timestamp_ms,
-                latest.voltage,
-                latest.soc);
+                latest.Voltage,
+                latest.SOC);
         }
         last_print_us = now;
         }
 
-        vTaskDelay(pdMS_TO_TICKS(ctx->period_ms));
-        */
+        //vTaskDelay(pdMS_TO_TICKS(ctx->period_ms));
+        
     }
 }
 

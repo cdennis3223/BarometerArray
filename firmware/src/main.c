@@ -15,6 +15,7 @@
 #include "screen.h"
 #include "SD.h"
 #include "BatMGMT.h"
+#include "logger.h"
 
 static const char *TAG = "MAIN";
 
@@ -39,18 +40,13 @@ void app_main(void)
 
     dps368_init(&dps, spi_handle);
 
-    collate_start_task(&pressure_buffer, &dps, 33);
+    sd_log_open("log.csv");
 
+    collate_start_task(&pressure_buffer, &dps, 33);
+    logger_start_task(&pressure_buffer);
     esp_err_t ret;
 
-    ret = sd_init();
-    printf("sd_init returned: %s\n", esp_err_to_name(ret));
-    if (ret != ESP_OK) {
-        printf("SD init failed\n");
-        return;
-    }
-
-    xTaskCreate(button_task, "button", 4096, NULL, 5, NULL);
+    xTaskCreate(button_task, "button", 4096, NULL, 1, NULL);
 
    /*
     xTaskCreate(
