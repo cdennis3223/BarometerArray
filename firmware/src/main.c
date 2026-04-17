@@ -26,13 +26,9 @@ static ring_buffer_t pressure_buffer;
 
 void app_main(void)
 {
-    vTaskDelay(pdMS_TO_TICKS(3000));
-    printf("HELLO FROM APP_MAIN\n");
-
     gps_uart_init();
     BatMGMT_init();
-    SD_init();
-
+    sd_init();
 
     ring_buffer_init(&pressure_buffer);
 
@@ -44,8 +40,6 @@ void app_main(void)
     dps368_init(&dps, spi_handle);
 
     collate_start_task(&pressure_buffer, &dps, 33);
-    
-
 
     esp_err_t ret;
 
@@ -56,17 +50,6 @@ void app_main(void)
         return;
     }
 
-    ret = sd_log_open("Wassup.csv");
-    printf("sd_log_open returned: %s\n", esp_err_to_name(ret));
-    if (ret != ESP_OK) {
-        printf("SD log open failed\n");
-        return;
-    }
-
-    ret = sd_log_sample(420.69f, 666);
-    printf("sd_log_sample returned: %s\n", esp_err_to_name(ret));
-
-    //sh1107_init();
     xTaskCreate(button_task, "button", 4096, NULL, 5, NULL);
 
    /*

@@ -74,7 +74,7 @@ esp_err_t sd_log_open(const char *name)
         ESP_LOGE("SD", "fopen failed %s (errno=%d: %s)", path, errno, strerror(errno));
         return ESP_FAIL;
     }
-    fprintf(g_f,"Pressure(hPa), Temperature(C), Time(UTC), Battery Voltage(V)\n");
+    fprintf(g_f,"Sample Number, Pressure(hPa), Temperature(C), Time(UTC), Battery Voltage(V)\n");
     fflush(g_f);
     return ESP_OK;
 }
