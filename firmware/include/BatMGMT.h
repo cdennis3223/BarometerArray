@@ -9,6 +9,6 @@
 #define I2C_NUM I2C_NUM_0
 #define BATMGMT_ADDR 0x36
 
-void BatMGMT_init(void);
+esp_err_t BatMGMT_init(void);
 float BatMGMT_readVoltage(void);
 float BatMGMT_readSOC(void);
