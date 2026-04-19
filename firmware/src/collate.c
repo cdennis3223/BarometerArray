@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include "GPS.h"
 #include "BatMGMT.h"
+#include "GlobalWatch.h"
 
 typedef struct {
     ring_buffer_t *rb;
@@ -59,7 +60,7 @@ static void collate_task(void *arg) {
     int64_t last_print_us = 0;
     uint32_t seq = 0;
 
-    while (1) {
+    while (!shutdown_requested) {
 
         sample_t s = {0};
         s.seq = seq++;
@@ -102,6 +103,8 @@ static void collate_task(void *arg) {
         vTaskDelay(pdMS_TO_TICKS(ctx->period_ms));
         
     }
+    printf("Collate task shutting down...\n");
+    vTaskDelete(NULL);
 }
 
 void collate_start_task(ring_buffer_t *rb, dps368_t *dev, uint32_t period_ms) {

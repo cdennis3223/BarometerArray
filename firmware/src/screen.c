@@ -9,6 +9,7 @@
 #include "driver/i2c.h"
 #include <stdio.h>
 #include "GPS.h"
+#include "GlobalWatch.h"
 #include "collate.h"
 
 static const char *TAG = "screen.c";
@@ -225,7 +226,7 @@ static void sh1107_init(void)
        // Init I2C bus
     i2c_master_bus_config_t bus_config = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
-        .i2c_port = I2C_NUM,
+        .i2c_port = I2C_NUM1,
         .scl_io_num = I2C_SCL_PIN,
         .sda_io_num = I2C_SDA_PIN,
         .glitch_ignore_cnt = 7,
@@ -318,56 +319,83 @@ static void sh1107_print_horizontal(uint8_t col, uint8_t page, const char *str) 
 void button_task(void *arg)
 {
     ring_buffer_t *pressure_buffer = (ring_buffer_t *)arg;
+
     button_init();
     sh1107_init();
 
     int state = 0;
-    bool last = false;
-    int64_t last_change_time = 0;
-    int64_t last_gps_redraw_time = 0;
-    const int debounce_ms = 20;
-    const int gps_redraw_ms = 250;
 
-    // Initial display
+    const int debounce_ms = 20;
+    const uint32_t LONG_PRESS_MS = 2000;
+
+    bool raw_last = (gpio_get_level(BUTTON_GPIO) == 0);   // active low
+    bool stable_state = raw_last;
+    int64_t last_raw_change_us = esp_timer_get_time();
+
+    bool button_pressed = false;
+    int64_t press_start_ms = 0;
+
     sh1107_clear();
-    sh1107_print_horizontal(0,15,"...");
+    sh1107_print_horizontal(0, 15, "...");
 
     while (1) {
-        bool current = (gpio_get_level(BUTTON_GPIO) == 0); // active LOW
-        int64_t now = esp_timer_get_time();
+        bool raw = (gpio_get_level(BUTTON_GPIO) == 0);
+        int64_t now_us = esp_timer_get_time();
+        int64_t now_ms = now_us / 1000;
 
-        // Debounce: only accept change if stable for 20 ms
-        if (current != last) {
-            if ((now - last_change_time) > debounce_ms * 1000) {
+        // Track raw changes
+        if (raw != raw_last) {
+            raw_last = raw;
+            last_raw_change_us = now_us;
+        }
 
-                // Detect press event (edge)
-                if (current == true) {
-                    state = (state + 1) % 3;
+        // Accept a new stable state only after debounce time
+        if ((now_us - last_raw_change_us) >= (debounce_ms * 1000) && stable_state != raw) {
+            stable_state = raw;
 
-                    sh1107_clear();
+            if (stable_state) {
+                // pressed
+                button_pressed = true;
+                press_start_ms = now_ms;
+                ESP_LOGI(TAG, "Button pressed");
+            } else {
+                // released
+                if (button_pressed) {
+                    int64_t press_duration = now_ms - press_start_ms;
+                    ESP_LOGI(TAG, "Button released, duration=%" PRId64 " ms", press_duration);
 
-                    if (state == 0) {
-                        //sh1107_print_horizontal(0,15,"PRESSURE:");
-                        //sh1107_print_horizontal(20,15,"TEMPERATURE:");
-                        render_pressure_screen(pressure_buffer);
-                    } else if (state == 1) {
-                       render_gps_screen();
-                    } else if (state == 2) {
-                        sh1107_print_horizontal(0,15,"SD CARD STATUS:");
+                    if (press_duration >= LONG_PRESS_MS) {
+                        shutdown_requested = true;
+                        ESP_LOGI(TAG, "Long press detected, initiating shutdown...");
+                    } else {
+                        state = (state + 1) % 3;
+                        ESP_LOGI(TAG, "Short press detected, state=%d", state);
+
+                        // Keep this light if possible
+                        sh1107_clear();
+
+                        if (state == 0) {
+                            render_pressure_screen(pressure_buffer);
+                        } else if (state == 1) {
+                            render_gps_screen();
+                        } else if (state == 2) {
+                            sh1107_print_horizontal(0, 15, "SD CARD STATUS:");
+                        }
                     }
                 }
 
-                last = current;
-                last_change_time = now;
+                button_pressed = false;
             }
-        }
-
-        //to refresh the GPS periodically 
-        if (state == 1 && (now - last_gps_redraw_time) >= gps_redraw_ms * 1000) {
-            render_gps_screen();
-            last_gps_redraw_time = now;
         }
 
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
+
+        //to refresh the GPS periodically 
+        /*
+        if (state == 1 && (now - last_gps_redraw_time) >= gps_redraw_ms * 1000) {
+            render_gps_screen();
+            last_gps_redraw_time = now;
+        }
+        */
