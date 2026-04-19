@@ -9,6 +9,7 @@
 #include "driver/i2c.h"
 #include <stdio.h>
 #include "GPS.h"
+#include "collate.h"
 
 static const char *TAG = "screen.c";
 
@@ -33,7 +34,7 @@ static void format_utc_time(const char *raw, char *out, size_t out_size)
     snprintf(out, out_size, "%.2s:%.2s:%.2s", raw, raw + 2, raw + 4);
 }
 
-static void draw_gps_screen(void)
+static void render_gps_screen(void)
 {
     gps_display_data_t gps_data = {0};
     char line[24];
@@ -45,23 +46,46 @@ static void draw_gps_screen(void)
     sh1107_print_horizontal(0, 15, "GPS DATA:");
 
     if (!gps_data.valid) {
-        sh1107_print_horizontal(20, 15, "WAITING FOR FIX");
-        sh1107_print_horizontal(40, 15, "LAT: --");
-        sh1107_print_horizontal(60, 15, "LON: --");
-        sh1107_print_horizontal(80, 15, "UTC: --:--:--");
+        sh1107_print_horizontal(10, 15, "WAITING FOR FIX");
+        sh1107_print_horizontal(20, 15, "LAT: --");
+        sh1107_print_horizontal(30, 15, "LON: --");
+        sh1107_print_horizontal(40, 15, "UTC: --:--:--");
         return;
     }
 
     snprintf(line, sizeof(line), "LAT: %.4f", gps_data.latitude);
-    sh1107_print_horizontal(20, 15, line);
+    sh1107_print_horizontal(10, 15, line);
 
     snprintf(line, sizeof(line), "LON: %.4f", gps_data.longitude);
-    sh1107_print_horizontal(40, 15, line);
+    sh1107_print_horizontal(20, 15, line);
 
     format_utc_time(gps_data.utc_time, utc, sizeof(utc));
     snprintf(line, sizeof(line), "UTC: %s", utc);
-    sh1107_print_horizontal(60, 15, line);
+    sh1107_print_horizontal(30, 15, line);
 }
+
+static void render_pressure_screen(ring_buffer_t *pressure_buffer)
+{
+    sample_t latest_sample;
+    char line[24];
+
+    sh1107_clear();
+    sh1107_print_horizontal(0, 15, "PRESSURE:");
+
+    if (!ring_buffer_peek_latest(pressure_buffer, &latest_sample)) {
+        sh1107_print_horizontal(10, 15, "NO DATA");
+        return;
+    }
+
+    snprintf(line, sizeof(line), "%.2f hPa", latest_sample.pressure);
+    sh1107_print_horizontal(10, 15, line);
+
+    sh1107_print_horizontal(20, 15, "TEMPERATURE:");
+    snprintf(line, sizeof(line), "%.2f C", latest_sample.temperature);
+    sh1107_print_horizontal(30, 15, line);
+}
+
+
 
 
 static void button_init(void)
@@ -293,6 +317,7 @@ static void sh1107_print_horizontal(uint8_t col, uint8_t page, const char *str) 
 //responds to botton task and cycles through readouts
 void button_task(void *arg)
 {
+    ring_buffer_t *pressure_buffer = (ring_buffer_t *)arg;
     button_init();
     sh1107_init();
 
@@ -322,10 +347,11 @@ void button_task(void *arg)
                     sh1107_clear();
 
                     if (state == 0) {
-                        sh1107_print_horizontal(0,15,"PRESSURE:");
-                        sh1107_print_horizontal(20,15,"TEMPERATURE:");
+                        //sh1107_print_horizontal(0,15,"PRESSURE:");
+                        //sh1107_print_horizontal(20,15,"TEMPERATURE:");
+                        render_pressure_screen(pressure_buffer);
                     } else if (state == 1) {
-                        draw_gps_screen();
+                       render_gps_screen();
                     } else if (state == 2) {
                         sh1107_print_horizontal(0,15,"SD CARD STATUS:");
                     }
@@ -336,8 +362,9 @@ void button_task(void *arg)
             }
         }
 
+        //to refresh the GPS periodically 
         if (state == 1 && (now - last_gps_redraw_time) >= gps_redraw_ms * 1000) {
-            draw_gps_screen();
+            render_gps_screen();
             last_gps_redraw_time = now;
         }
 

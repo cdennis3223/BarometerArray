@@ -1,5 +1,4 @@
-#ifndef GPS_H
-#define GPS_H
+#pragma once
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -29,13 +28,9 @@ extern gps_time_sync_t gps_time;
 extern gps_display_data_t gps_display_data;
 
 
-void gps_uart_init(void);
-
 void gps_factory_reset();
 
 void gps_task(void *arg);
 
 void gps_get_display_data(gps_display_data_t *out);
 
-
-#endif

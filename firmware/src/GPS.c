@@ -28,7 +28,7 @@ void gps_get_display_data(gps_display_data_t *out)
     portEXIT_CRITICAL(&gps_data_lock);
 }
 
-void gps_uart_init(void)
+static void gps_uart_init(void)
 {
     const uart_config_t uart_config = {
         .baud_rate = 9600,
@@ -53,11 +53,15 @@ void gps_factory_reset(void)
 
 void gps_task(void *arg)
 {
+
+
     uint8_t rx_buf[128];
     char line[128];
     int idx = 0;
     bool in_sentence = false;
     nmea_data_t data;
+
+    gps_uart_init();
 
     while (1) {
         int len = uart_read_bytes(GPS_UART, rx_buf, sizeof(rx_buf), pdMS_TO_TICKS(100));
@@ -102,8 +106,26 @@ void gps_task(void *arg)
                     }
                 }
                 */
-
                 if (nmea_parse(line, &data)) {
+                    //ESP_LOGI(TAG, "parsed: rmc.valid=%d rmc.time=%s", data.rmc.valid, data.rmc.time);
+                    if (data.rmc.valid) {
+                        uint32_t sec = rmc_time_to_seconds(data.rmc.time);
+
+                        gps_time.utc_sync_us = (uint64_t)sec * 1000000ULL;
+                        gps_time.local_sync_us = esp_timer_get_time();
+                        gps_time.valid = true;
+
+                        gps_display_data.valid = true;
+                        gps_display_data.latitude = data.rmc.lat;
+                        gps_display_data.longitude = data.rmc.lon;
+
+                        strncpy(gps_display_data.utc_time,
+                                data.rmc.time,
+                                sizeof(gps_display_data.utc_time) - 1);
+                        gps_display_data.utc_time[sizeof(gps_display_data.utc_time) - 1] = '\0';
+                    }
+
+                     /* 
                     if (data.rmc.valid) {
                         uint32_t sec = rmc_time_to_seconds(data.rmc.time);
 
@@ -124,6 +146,8 @@ void gps_task(void *arg)
                             //data.rmc.time,
                             //(unsigned)sec);
                     }
+
+                    */  
                 }
 
 

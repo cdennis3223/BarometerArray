@@ -27,9 +27,16 @@ static ring_buffer_t pressure_buffer;
 
 void app_main(void)
 {
-    gps_uart_init();
-    BatMGMT_init();
-    sd_init();
+    
+    //BatMGMT_init();
+
+
+    esp_err_t ret;
+    //ret =  sd_init();
+    //vTaskDelay(2000);
+    //printf("SD init returned %d\n", ret);
+    //vTaskDelay(2000);
+    
 
     ring_buffer_init(&pressure_buffer);
 
@@ -40,22 +47,17 @@ void app_main(void)
 
     dps368_init(&dps, spi_handle);
 
-    sd_log_open("log.csv");
+    //sd_log_open("log.csv");
 
+
+    // =====task creation==================================
     collate_start_task(&pressure_buffer, &dps, 33);
-    logger_start_task(&pressure_buffer);
-    esp_err_t ret;
+    //logger_start_task(&pressure_buffer);
 
-    xTaskCreate(button_task, "button", 4096, NULL, 1, NULL);
+    xTaskCreate(gps_task, "gps_task", 4096, NULL, 5,NULL);
 
-    xTaskCreate(
-        gps_task,
-        "gps_task",
-        4096,
-        NULL,
-        5,
-        NULL
-    );
-    
-    
+
+    xTaskCreate(button_task, "button", 4096, &pressure_buffer, 1, NULL);
+
+
 }

@@ -65,8 +65,8 @@ static void collate_task(void *arg) {
         s.seq = seq++;
         s.pressure = corrected_pressure(ctx->dev);
         s.temperature = corrected_temperature(ctx->dev);
-        s.Voltage = BatMGMT_readVoltage();
-        s.SOC = BatMGMT_readSOC();
+        //s.Voltage = BatMGMT_readVoltage();
+        //s.SOC = BatMGMT_readSOC();
 
         int64_t now = esp_timer_get_time();
 
@@ -86,6 +86,7 @@ static void collate_task(void *arg) {
         
         if ((now - last_print_us) >= 3000000) {
             sample_t latest;
+        /*
         if (ring_buffer_peek_latest(ctx->rb, &latest)) {
             printf("latest: pressure=%.2f temp=%.2f timestamp_ms=%lu voltage=%.2f soc=%.2f\n",
                 latest.pressure,
@@ -94,6 +95,7 @@ static void collate_task(void *arg) {
                 latest.Voltage,
                 latest.SOC);
         }
+        */
         last_print_us = now;
         }
 
