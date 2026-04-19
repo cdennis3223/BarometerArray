@@ -7,25 +7,30 @@
 #include "BatMGMT.h"
 #include "GlobalWatch.h"
 
-typedef struct {
+typedef struct
+{
     ring_buffer_t *rb;
     dps368_t *dev;
     uint32_t period_ms;
 } collate_task_args_t;
 
-static inline int next_index(int index) {
+static inline int next_index(int index)
+{
     return (index + 1) % BUFFER_SIZE;
 }
 
-void ring_buffer_init(ring_buffer_t *rb) {
+void ring_buffer_init(ring_buffer_t *rb)
+{
     rb->head = 0;
     rb->tail = 0;
 }
 
-void ring_buffer_push(ring_buffer_t *rb, sample_t s) {
+void ring_buffer_push(ring_buffer_t *rb, sample_t s)
+{
     int next = next_index(rb->head);
 
-    if (next == rb->tail) {
+    if (next == rb->tail)
+    {
         // buffer full, overwrite oldest
         rb->tail = next_index(rb->tail);
     }
@@ -34,8 +39,10 @@ void ring_buffer_push(ring_buffer_t *rb, sample_t s) {
     rb->head = next;
 }
 
-bool ring_buffer_pop(ring_buffer_t *rb, sample_t *s) {
-    if (rb->head == rb->tail) {
+bool ring_buffer_pop(ring_buffer_t *rb, sample_t *s)
+{
+    if (rb->head == rb->tail)
+    {
         return false;
     }
 
@@ -44,8 +51,10 @@ bool ring_buffer_pop(ring_buffer_t *rb, sample_t *s) {
     return true;
 }
 
-bool ring_buffer_peek_latest(ring_buffer_t *rb, sample_t *s) {
-    if (rb->head == rb->tail) {
+bool ring_buffer_peek_latest(ring_buffer_t *rb, sample_t *s)
+{
+    if (rb->head == rb->tail)
+    {
         return false;
     }
 
@@ -54,62 +63,58 @@ bool ring_buffer_peek_latest(ring_buffer_t *rb, sample_t *s) {
     return true;
 }
 
-static void collate_task(void *arg) {
+static void collate_task(void *arg)
+{
     collate_task_args_t *ctx = (collate_task_args_t *)arg;
 
     int64_t last_print_us = 0;
     uint32_t seq = 0;
 
-    while (!shutdown_requested) {
+    while (!shutdown_requested)
+    {
 
         sample_t s = {0};
+        int64_t now_us = esp_timer_get_time();
+
         s.seq = seq++;
         s.pressure = corrected_pressure(ctx->dev);
         s.temperature = corrected_temperature(ctx->dev);
-        //s.Voltage = BatMGMT_readVoltage();
-        //s.SOC = BatMGMT_readSOC();
+        // s.Voltage = BatMGMT_readVoltage();
+        // s.SOC = BatMGMT_readSOC();
 
-        int64_t now = esp_timer_get_time();
+        s.esp_time_ms = (uint64_t)(now_us / 1000ULL);
 
+        bool gps_valid;
+        uint64_t utc_sync_us;
+        int64_t local_sync_us;
 
-        if (gps_time.valid) {
-            int64_t delta = now - gps_time.local_sync_us;
-            uint64_t utc_us = gps_time.utc_sync_us + delta;
-            s.timestamp_ms = (uint32_t)(utc_us / 1000ULL);
+        s.esp_time_ms = (uint64_t)(now_us / 1000ULL);
 
-        } else {
-            s.timestamp_ms = (uint32_t)(now / 1000ULL);
+        if (gps_get_sync_snapshot(&gps_valid, &utc_sync_us, &local_sync_us) &&
+            gps_valid && now_us >= local_sync_us)
+        {
+            uint64_t utc_now_us = utc_sync_us + (uint64_t)(now_us - local_sync_us);
+            s.utc_time_ms = utc_now_us / 1000ULL;
+            s.valid_time = true;
         }
-
+        else
+        {
+            s.utc_time_ms = 0;
+            s.valid_time = false;
+        }
 
         ring_buffer_push(ctx->rb, s);
-
-        
-        if ((now - last_print_us) >= 3000000) {
-            sample_t latest;
-        /*
-        if (ring_buffer_peek_latest(ctx->rb, &latest)) {
-            printf("latest: pressure=%.2f temp=%.2f timestamp_ms=%lu voltage=%.2f soc=%.2f\n",
-                latest.pressure,
-                latest.temperature,
-                (unsigned long)latest.timestamp_ms,
-                latest.Voltage,
-                latest.SOC);
-        }
-        */
-        last_print_us = now;
-        }
-
         vTaskDelay(pdMS_TO_TICKS(ctx->period_ms));
-        
     }
     printf("Collate task shutting down...\n");
     vTaskDelete(NULL);
 }
 
-void collate_start_task(ring_buffer_t *rb, dps368_t *dev, uint32_t period_ms) {
+void collate_start_task(ring_buffer_t *rb, dps368_t *dev, uint32_t period_ms)
+{
     collate_task_args_t *args = malloc(sizeof(collate_task_args_t));
-    if (args == NULL) {
+    if (args == NULL)
+    {
         return;
     }
 

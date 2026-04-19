@@ -7,6 +7,7 @@
 #define GPS_UART        UART_NUM_2
 #define GPS_TX_PIN      1      //this is TX2 on the devkit
 #define GPS_RX_PIN      2      //this is RX2 on the devkit
+#define GPS_PPS_PIN     39
 #define GPS_BUF_SIZE    1024
 
 
@@ -27,6 +28,7 @@ typedef struct {
 extern gps_time_sync_t gps_time;
 extern gps_display_data_t gps_display_data;
 
+bool gps_get_sync_snapshot(bool *valid, uint64_t *utc_sync_us, int64_t *local_sync_us);
 
 void gps_factory_reset();
 

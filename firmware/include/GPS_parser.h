@@ -33,7 +33,7 @@ typedef struct {
 
 
 
-
+bool rmc_datetime_to_epoch_us(const char *date_str, const char *time_str, uint64_t *out_utc_us);
 
 
 bool nmea_parse(char *sentence, nmea_data_t *data);

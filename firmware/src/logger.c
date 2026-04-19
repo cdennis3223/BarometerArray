@@ -10,9 +10,9 @@ void logger_task(void *args) {
     while (1) {
         sample_t s;
         bool sample = ring_buffer_pop(rb, &s);
-        
+
         if (sample) {
-            sd_log_sample(s.pressure, s.temperature, s.timestamp_ms, s.Voltage, s.seq);
+            sd_log_sample(s.pressure, s.temperature, s.esp_time_ms, s.utc_time_ms, s.valid_time, s.Voltage, s.seq);
             last_logged_seq = s.seq;
             have_logged_any = true; 
             }
@@ -30,8 +30,4 @@ void logger_task(void *args) {
         }
         vTaskDelay(pdMS_TO_TICKS(100));
     }
-}  
-
-void logger_start_task(ring_buffer_t *rb) {
-    xTaskCreate(logger_task, "logger_task", 4096, rb, 4, NULL);
-}
+} 

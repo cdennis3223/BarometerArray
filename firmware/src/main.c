@@ -49,7 +49,8 @@ void app_main(void)
 
     // =====task creation==================================
     collate_start_task(&pressure_buffer, &dps, 33);
-    logger_start_task(&pressure_buffer);
+
+    xTaskCreate(logger_task, "logger_task", 4096, &pressure_buffer, 4, NULL);
 
     xTaskCreate(gps_task, "gps_task", 4096, NULL, 5,NULL);
 

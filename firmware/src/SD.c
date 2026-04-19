@@ -74,20 +74,22 @@ esp_err_t sd_log_open(const char *name)
         ESP_LOGE("SD", "fopen failed %s (errno=%d: %s)", path, errno, strerror(errno));
         return ESP_FAIL;
     }
-    fprintf(g_f,"Sample Number, Pressure(hPa), Temperature(C), Time(UTC), Battery Voltage(V)\n");
+    fprintf(g_f,"Sample Number, Pressure(hPa), Temperature(C), Time(ESP), Time(UTC), Valid Time, Battery Voltage(V)\n");
     fflush(g_f);
     return ESP_OK;
 }
 
-esp_err_t sd_log_sample(float p_pa, uint32_t t_c, float time, float Voltage, uint32_t seq)
+esp_err_t sd_log_sample(float p_pa, uint32_t t_c, uint64_t esp_time, uint64_t utc_time, bool valid_time, float Voltage, uint64_t seq)
 {
     if (!g_f) return ESP_ERR_INVALID_STATE;
 
-    int n = fprintf(g_f, "%lu,%.6f,%lu,%.4f,%.2f\n",
+    int n = fprintf(g_f, "%lu,%.6f,%lu,%lu,%lu,%s,%.2f\n",
                 (unsigned long)seq,
                 (double)p_pa,
                 (unsigned long)t_c,
-                (float) time,
+                (unsigned long)esp_time,
+                (unsigned long)utc_time,
+                valid_time ? "true" : "false",
                 (float) Voltage);
 
     if (n <= 0) {

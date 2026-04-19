@@ -12,15 +12,6 @@
 #define NMEA_MAX_FIELDS 25
 #define NMEA_MAX_LEN 83 /* NMEA spec: 82 chars + null */
 
-
-
-
-
-
-
-
-
-
 //tokenizer, breaks string into an array(fields) of smaller strings
 static int parse_comma_delimited_str(char *string, char **fields, int max_fields)
 {
@@ -202,6 +193,74 @@ bool nmea_parse(char *sentence, nmea_data_t *data)
         return parse_rmc(fields, n, &data->rmc);
 
     return false; /* Sentence type not handled */
+}
+
+//Help cleanly convert RMC date/time to epoch microseconds for easier timestamp handling.
+// Note that this does not handle time zones or leap seconds, but should be sufficient for 
+//basic logging purposes.
+
+static bool is_leap_year(int year)
+{
+    return ((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0);
+}
+
+static int days_in_month(int year, int month)
+{
+    static const int dim[12] = {31,28,31,30,31,30,31,31,30,31,30,31};
+    if (month == 2 && is_leap_year(year)) {
+        return 29;
+    }
+    return dim[month - 1];
+}
+
+static uint64_t date_time_to_epoch_seconds(int year, int month, int day,
+                                           int hour, int minute, int second)
+{
+    uint64_t days = 0;
+
+    for (int y = 1970; y < year; y++) {
+        days += is_leap_year(y) ? 366 : 365;
+    }
+
+    for (int m = 1; m < month; m++) {
+        days += days_in_month(year, m);
+    }
+
+    days += (day - 1);
+
+    return days * 86400ULL + (uint64_t)hour * 3600ULL +
+           (uint64_t)minute * 60ULL + (uint64_t)second;
+}
+
+bool rmc_datetime_to_epoch_us(const char *date_str, const char *time_str, uint64_t *out_utc_us)
+{
+    if (!date_str || !time_str || !out_utc_us) {
+        return false;
+    }
+
+    if (strlen(date_str) < 6 || strlen(time_str) < 6) {
+        return false;
+    }
+
+    int day   = (date_str[0] - '0') * 10 + (date_str[1] - '0');
+    int month = (date_str[2] - '0') * 10 + (date_str[3] - '0');
+    int year2 = (date_str[4] - '0') * 10 + (date_str[5] - '0');
+
+    int hour   = (time_str[0] - '0') * 10 + (time_str[1] - '0');
+    int minute = (time_str[2] - '0') * 10 + (time_str[3] - '0');
+    int second = (time_str[4] - '0') * 10 + (time_str[5] - '0');
+
+    int year = 2000 + year2;
+
+    if (month < 1 || month > 12 || day < 1 || day > 31 ||
+        hour < 0 || hour > 23 || minute < 0 || minute > 59 ||
+        second < 0 || second > 60) {
+        return false;
+    }
+
+    uint64_t epoch_sec = date_time_to_epoch_seconds(year, month, day, hour, minute, second);
+    *out_utc_us = epoch_sec * 1000000ULL;
+    return true;
 }
 
 /* -----------------------------------------------------------------------
