@@ -11,6 +11,7 @@
 #include "GPS.h"
 #include "GlobalWatch.h"
 #include "collate.h"
+#include "BatMGMT.h"
 
 static const char *TAG = "screen.c";
 
@@ -35,6 +36,8 @@ static void format_utc_time(const char *raw, char *out, size_t out_size)
     snprintf(out, out_size, "%.2s:%.2s:%.2s", raw, raw + 2, raw + 4);
 }
 
+
+//===screen rendering states========================================================
 static void render_gps_screen(void)
 {
     gps_display_data_t gps_data = {0};
@@ -84,6 +87,18 @@ static void render_pressure_screen(ring_buffer_t *pressure_buffer)
     sh1107_print_horizontal(20, 15, "TEMPERATURE:");
     snprintf(line, sizeof(line), "%.2f C", latest_sample.temperature);
     sh1107_print_horizontal(30, 15, line);
+}
+
+static void render_battery_screen(){
+    sh1107_print_horizontal(0, 15, "BATTERY STATUS");
+    float voltage = BatMGMT_readVoltage();
+    float SoC = BatMGMT_readSOC();
+    char line[24];
+    snprintf(line, sizeof(line), "VOLTAGE: %.4f", voltage);
+    sh1107_print_horizontal(10, 15, line);
+
+    snprintf(line, sizeof(line), "SOC: %.4f", SoC);
+    sh1107_print_horizontal(20, 15, line);
 }
 
 
@@ -368,7 +383,7 @@ void button_task(void *arg)
                         shutdown_requested = true;
                         ESP_LOGI(TAG, "Long press detected, initiating shutdown...");
                     } else {
-                        state = (state + 1) % 3;
+                        state = (state + 1) % 4;
                         ESP_LOGI(TAG, "Short press detected, state=%d", state);
 
                         // Keep this light if possible
@@ -379,7 +394,9 @@ void button_task(void *arg)
                         } else if (state == 1) {
                             render_gps_screen();
                         } else if (state == 2) {
-                            sh1107_print_horizontal(0, 15, "SD CARD STATUS:");
+                            sh1107_print_horizontal(0, 15, "SD CARD STATUS:");  
+                        } else if (state == 3) {
+                            render_battery_screen();
                         }
                     }
                 }
@@ -399,3 +416,4 @@ void button_task(void *arg)
             last_gps_redraw_time = now;
         }
         */
+        

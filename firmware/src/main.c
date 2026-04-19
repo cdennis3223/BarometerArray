@@ -33,7 +33,7 @@ void app_main(void)
     
     esp_log_level_set("*", ESP_LOG_INFO);
 
-    //BatMGMT_init();
+    BatMGMT_init();
     sd_init();
 
     ring_buffer_init(&pressure_buffer);
