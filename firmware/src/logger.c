@@ -3,16 +3,18 @@
 #include "GlobalWatch.h"
 #include "driver/gpio.h"
 
+//checks if SD card is present
 static bool card_inserted(void) {
     return gpio_get_level(DETECT_PIN) == 0; // active low
 }
 
 void logger_task(void *args) {
-    ring_buffer_t *rb = (ring_buffer_t *)args;
+    ring_buffer_t *rb = (ring_buffer_t *)args; //casting back to ring buffer type
     uint32_t last_logged_seq = 0;
     bool have_logged_any = false;
     bool card_present = false;
 
+    //configuring up the detection pin
     gpio_config_t io_conf = {
         .pin_bit_mask = (1ULL << DETECT_PIN),
         .mode = GPIO_MODE_INPUT,
@@ -25,6 +27,7 @@ void logger_task(void *args) {
     while (1) {
         bool detected = card_inserted();
 
+        //checking if card is being inserted
         if (detected && !card_present) {
             vTaskDelay(pdMS_TO_TICKS(200)); // debounce
             if (card_inserted()) {
@@ -33,13 +36,14 @@ void logger_task(void *args) {
                     printf("SD card inserted, logging resumed\n");
                 }
             }
+        //unexpected removal handling
         } else if (!detected && card_present) {
             sd_log_close();
             sd_deinit();
             card_present = false;
             printf("SD card removed\n");
         }
-
+        //while card is present save data from ring buffer to it
         if (card_present) {
             sample_t s;
             if (ring_buffer_pop(rb, &s)) {
@@ -49,7 +53,7 @@ void logger_task(void *args) {
                 have_logged_any = true;
             }
         }
-
+        //intentional shutdown and removal handling
         if (!card_inserted() && shutdown_requested) {
             sd_log_close();
             sd_deinit();
@@ -60,7 +64,6 @@ void logger_task(void *args) {
             logger_done = true;
             vTaskDelete(NULL);
         }
-
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }

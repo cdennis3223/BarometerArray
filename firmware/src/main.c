@@ -34,18 +34,16 @@ void app_main(void)
     esp_log_level_set("*", ESP_LOG_INFO);
 
     BatMGMT_init();
-    //sd_init();
 
     ring_buffer_init(&pressure_buffer);
 
+    //need to setup SPI bus before dsp368 configuration
     if (spi_bus_init(&spi_handle) != ESP_OK) {
         printf("SPI init failed\n");
         return;
     }
-
     dps368_init(&dps, spi_handle);
 
-    //sd_log_open("log.csv");
 
     // =====task creation==================================
     collate_start_task(&pressure_buffer, &dps, 33);

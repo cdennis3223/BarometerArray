@@ -72,17 +72,14 @@ static void collate_task(void *arg)
 
     while (!shutdown_requested)
     {
-
         sample_t s = {0};
         int64_t now_us = esp_timer_get_time();
 
         s.seq = seq++;
         s.pressure = corrected_pressure(ctx->dev);
         s.temperature = corrected_temperature(ctx->dev);
-        // s.Voltage = BatMGMT_readVoltage();
-        // s.SOC = BatMGMT_readSOC();
-
-        s.esp_time_ms = (uint64_t)(now_us / 1000ULL);
+        s.Voltage = BatMGMT_readVoltage();
+        s.SOC = BatMGMT_readSOC();
 
         bool gps_valid;
         uint64_t utc_sync_us;
