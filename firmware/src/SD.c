@@ -123,3 +123,6 @@ void sd_log_close(void)
         g_f = NULL;
     }
 }
+
+bool sd_is_mounted(void) { return g_card != NULL; }
+bool sd_is_logging(void) { return g_f != NULL; }

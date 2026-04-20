@@ -150,19 +150,6 @@ void gps_task(void *arg)
 
                 memset(&data, 0, sizeof(data));
 
-                // Optional raw debug
-                // ESP_LOGI(TAG, "%s", line);
-
-                /*
-                if (nmea_parse(line, &data)) {
-                    if (data.rmc.valid) {
-                        printf("RMC: %s %s (%u sec)\n",
-                               data.rmc.date,
-                               data.rmc.time,
-                               (unsigned)rmc_time_to_seconds(data.rmc.time));
-                    }
-                }
-                */
                 if (nmea_parse(line, &data))
                 {
                     if (data.rmc.valid)
@@ -211,46 +198,18 @@ void gps_task(void *arg)
                         }
                     }
                 }
-
-                /*
-               if (data.rmc.valid) {
-                   uint32_t sec = rmc_time_to_seconds(data.rmc.time);
-
-                   gps_time.utc_sync_us = (uint64_t)sec * 1000000ULL;
-                   gps_time.local_sync_us = esp_timer_get_time();
-                   gps_time.valid = true;
-
-                   portENTER_CRITICAL(&gps_data_lock);
-                   gps_display_data.latitude = data.rmc.lat;
-                   gps_display_data.longitude = data.rmc.lon;
-                   strncpy(gps_display_data.utc_time, data.rmc.time, sizeof(gps_display_data.utc_time) - 1);
-                   gps_display_data.utc_time[sizeof(gps_display_data.utc_time) - 1] = '\0';
-                   gps_display_data.valid = true;
-                   portEXIT_CRITICAL(&gps_data_lock);
-
-                   //printf("RMC: %s %s (%u sec)\n",
-                       //data.rmc.date,
-                       //data.rmc.time,
-                       //(unsigned)sec);
-               }
-
-               */
+                
+                idx = 0;
+                in_sentence = false;
+                continue;
             }
 
-        //     idx = 0;
-        //     in_sentence = false;
-        //     continue;
-        // }
-
-        // if (idx < sizeof(line) - 1)
-        // {
-        //     line[idx++] = c;
-        // }
-        // else
-        // {
-        //     idx = 0;
-        //     in_sentence = false;
-        // }
+            if (idx < sizeof(line) - 1) {
+                line[idx++] = c;
+            } else {
+                idx = 0;
+                in_sentence = false;
+            }
+        }
     }
-}
 }

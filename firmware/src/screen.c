@@ -12,6 +12,8 @@
 #include "GlobalWatch.h"
 #include "collate.h"
 #include "BatMGMT.h"
+#include "SD.h"
+
 
 static const char *TAG = "screen.c";
 
@@ -101,8 +103,12 @@ static void render_battery_screen(){
     sh1107_print_horizontal(20, 15, line);
 }
 
-
-
+static void render_sd_screen(void) {
+    sh1107_clear();
+    sh1107_print_horizontal(0, 15, "SD CARD:");
+    sh1107_print_horizontal(10, 15, sd_is_mounted() ? "MOUNTED" : "NOT FOUND");
+    sh1107_print_horizontal(20, 15, sd_is_logging() ? "LOGGING" : "NOT LOGGING");
+}
 
 static void button_init(void)
 {
@@ -116,7 +122,6 @@ static void button_init(void)
 
     gpio_config(&io_conf);
 }
-
 
 
 //=========================================================================
@@ -299,7 +304,6 @@ static void sh1107_clear(void)
     }
 }
 
-
 static void sh1107_print_horizontal(uint8_t col, uint8_t page, const char *str) {
     while (*str) {
         char c = *str++;
@@ -393,20 +397,19 @@ void button_task(void *arg)
                             render_pressure_screen(pressure_buffer);
                         } else if (state == 1) {
                             render_gps_screen();
-                        } else if (state == 2) {
-                            sh1107_print_horizontal(0, 15, "SD CARD STATUS:");  
                         } else if (state == 3) {
                             render_battery_screen();
-                        }
+                        }else if (state == 2) {
+                            render_sd_screen();
                     }
                 }
 
                 button_pressed = false;
             }
         }
-
         vTaskDelay(pdMS_TO_TICKS(10));
     }
+}
 }
 
         //to refresh the GPS periodically 
