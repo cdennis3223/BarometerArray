@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <time.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/uart.h"
@@ -10,6 +11,7 @@
 #include "GPS_parser.h"
 #include "esp_timer.h"
 #include "freertos/portmacro.h"
+#include "sys/time.h"
 #include "driver/gpio.h"
 
 static const char *TAG = "GPS";
@@ -66,7 +68,7 @@ void pps_gpio_init(gpio_num_t pps_gpio)
         .pin_bit_mask = (1ULL << pps_gpio),
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_ENABLE,
         .intr_type = GPIO_INTR_POSEDGE};
     gpio_config(&io_conf);
 
@@ -99,6 +101,27 @@ bool gps_get_sync_snapshot(bool *valid, uint64_t *utc_sync_us, int64_t *local_sy
     *utc_sync_us = gps_time.utc_sync_us;
     *local_sync_us = gps_time.local_sync_us;
     portEXIT_CRITICAL(&gps_data_lock);
+
+    return true;
+}
+
+bool utc_ms_to_parts(int64_t utc_ms, sample_t *out){
+    if (!out) {
+        return false;
+    }
+
+    time_t seconds = utc_ms / 1000;
+    struct tm tm_time;
+
+    gmtime_r(&seconds, &tm_time);
+
+    out->year = tm_time.tm_year + 1900;
+    out->month = tm_time.tm_mon + 1;
+    out->day = tm_time.tm_mday;
+    out->hour = tm_time.tm_hour;
+    out->minute = tm_time.tm_min;
+    out->second = tm_time.tm_sec;
+    out->millisecond = utc_ms % 1000;
 
     return true;
 }

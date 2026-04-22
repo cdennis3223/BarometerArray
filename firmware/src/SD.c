@@ -8,6 +8,8 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include "GPS.h"
+#include "collate.h"
 
 static const char *TAG = "SD";
 static FILE *g_f = NULL;
@@ -64,33 +66,47 @@ esp_err_t sd_deinit(void)
 }
 
 // Opens a log file for writing. Caller should call sd_log_close() when done.
-esp_err_t sd_log_open(const char *name)
+esp_err_t sd_log_open(const char *name, const char *mode)
 {
     char path[128];
     snprintf(path, sizeof(path), "/sdcard/%s", name);
 
-    g_f = fopen(path, "w");
+    if (strcmp(mode, "a") == 0){
+    g_f = fopen(path, mode);
     if (!g_f) {
         ESP_LOGE("SD", "fopen failed %s (errno=%d: %s)", path, errno, strerror(errno));
         return ESP_FAIL;
     }
-    fprintf(g_f,"Sample Number, Pressure(hPa), Temperature(C), Time(ESP), Time(UTC), Valid Time, Battery Voltage(V)\n");
+} else {
+    g_f = fopen(path, mode);
+    if(!g_f) {
+        ESP_LOGE("SD", "fopen failed %s (errno=%d: %s)", path, errno, strerror(errno));
+        return ESP_FAIL;
+    }
+    fprintf(g_f,"Year,Month,Day,Hour,Minute,Second,Millisecond,Pressure(hPa),Temperature(C),Time(ESP),Battery Voltage(V),Valid Time\n");
     fflush(g_f);
+}
     return ESP_OK;
 }
 
-esp_err_t sd_log_sample(float p_pa, uint32_t t_c, uint64_t esp_time, uint64_t utc_time, bool valid_time, float Voltage, uint64_t seq)
+esp_err_t sd_log_sample(const sample_t *s)
 {
     if (!g_f) return ESP_ERR_INVALID_STATE;
 
-    int n = fprintf(g_f, "%lu,%.6f,%lu,%lu,%lu,%s,%.2f\n",
-                (unsigned long)seq,
-                (double)p_pa,
-                (unsigned long)t_c,
-                (unsigned long)esp_time,
-                (unsigned long)utc_time,
-                valid_time ? "true" : "false",
-                (float) Voltage);
+    int n = fprintf(g_f, "%04d,%02d,%02d,%02d,%02d,%02d,%03d,%.10f,%.2f,%llu,%.2f,%s\n",
+                (unsigned short)s->year,
+                (unsigned short)s->month,
+                (unsigned short)s->day,
+                (unsigned short)s->hour,
+                (unsigned short)s->minute,
+                (unsigned short)s->second,
+                (unsigned short)s->millisecond,
+                //(unsigned long)s.seq,
+                (double)s->pressure,
+                (double)s->temperature,
+                (unsigned long long)s->esp_time_ms,
+                (float) s->Voltage,
+                (char) s->valid_time ? "true" : "false");
 
     if (n <= 0) {
         ESP_LOGE("SD", "fprintf failed (errno=%d: %s)", errno, strerror(errno));
@@ -102,7 +118,7 @@ esp_err_t sd_log_sample(float p_pa, uint32_t t_c, uint64_t esp_time, uint64_t ut
     // so we want to do it often enough to not lose much data if power is lost, 
     //but not so often that we degrade performance.
     lines_since_flush++;
-    if (lines_since_flush >= 25) {
+    if (lines_since_flush >= 50) {
     if (fflush(g_f) != 0) {
         ESP_LOGE("SD", "fflush failed (errno=%d: %s)", errno, strerror(errno));
     }

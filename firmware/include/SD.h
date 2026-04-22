@@ -2,6 +2,8 @@
 
 #include "esp_log.h"
 #include "driver/gpio.h"
+#include "GPS.h"
+#include "collate.h"
 
 //Define all GPIO pins for SD Card
 #define SD_CLK_PIN 15
@@ -18,9 +20,9 @@ esp_err_t sd_init(void);
 
 esp_err_t sd_deinit(void);
 
-esp_err_t sd_log_open(const char *name);
+esp_err_t sd_log_open(const char *name, const char *mode);
 
-esp_err_t sd_log_sample(float p_pa, uint32_t t_c, uint64_t esp_time, uint64_t utc_time, bool valid_time, float Voltage, uint64_t seq);
+esp_err_t sd_log_sample(const sample_t *s);
 
 void sd_log_close(void);
 

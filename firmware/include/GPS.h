@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "driver/uart.h"
+#include "collate.h"
 
 #define GPS_UART        UART_NUM_2
 #define GPS_TX_PIN      1      //this is TX2 on the devkit
@@ -29,6 +30,8 @@ extern gps_time_sync_t gps_time;
 extern gps_display_data_t gps_display_data;
 
 bool gps_get_sync_snapshot(bool *valid, uint64_t *utc_sync_us, int64_t *local_sync_us);
+
+bool utc_ms_to_parts(int64_t utc_ms, sample_t *out);
 
 void gps_factory_reset();
 

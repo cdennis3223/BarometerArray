@@ -136,7 +136,7 @@ static bool parse_rmc(char **f, int n, nmea_rmc_t *out)
     strncpy(out->date, f[9], sizeof(out->date) - 1);
     out->date[sizeof(out->date) - 1] = '\0';
 
-    out->valid = true; //out->active;
+    out->valid = out->active;
     return true;
 }
 

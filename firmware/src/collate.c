@@ -5,7 +5,10 @@
 #include <stdlib.h>
 #include "GPS.h"
 #include "BatMGMT.h"
+#include "logger.h"
 #include "GlobalWatch.h"
+
+static uint32_t sequence_start = 0;
 
 typedef struct
 {
@@ -33,6 +36,7 @@ void ring_buffer_push(ring_buffer_t *rb, sample_t s)
     {
         // buffer full, overwrite oldest
         rb->tail = next_index(rb->tail);
+        printf("Warning: Ring buffer overflow, overwriting oldest sample\n");
     }
 
     rb->buffer[rb->head] = s;
@@ -68,14 +72,21 @@ static void collate_task(void *arg)
     collate_task_args_t *ctx = (collate_task_args_t *)arg;
 
     int64_t last_print_us = 0;
-    uint32_t seq = 0;
 
     while (!shutdown_requested)
     {
         sample_t s = {0};
+
+        if (!sampling_enabled) {
+            s.seq = 0;
+            vTaskDelay(pdMS_TO_TICKS(100));
+            printf("Sampling paused, collate task waiting...\n");
+            continue;
+        }
+        
         int64_t now_us = esp_timer_get_time();
 
-        s.seq = seq++;
+        s.seq = sequence_start++;
         s.pressure = corrected_pressure(ctx->dev);
         s.temperature = corrected_temperature(ctx->dev);
         s.Voltage = BatMGMT_readVoltage();
@@ -98,6 +109,10 @@ static void collate_task(void *arg)
         {
             s.utc_time_ms = 0;
             s.valid_time = false;
+        }
+
+        if (s.valid_time){
+            utc_ms_to_parts(s.utc_time_ms, &s);
         }
 
         ring_buffer_push(ctx->rb, s);

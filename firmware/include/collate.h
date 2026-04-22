@@ -8,12 +8,19 @@
 
 typedef struct {
     uint32_t seq;
-    float pressure;
+    double pressure;
     float temperature;
     float Voltage;
     float SOC;
     uint64_t esp_time_ms;
     uint64_t utc_time_ms;
+    uint16_t year;
+    uint8_t month;
+    uint8_t day;
+    uint8_t hour;
+    uint8_t minute;
+    uint8_t second;
+    uint8_t millisecond;
     bool valid_time;
 } sample_t;
 

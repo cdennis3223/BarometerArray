@@ -178,7 +178,7 @@ static int32_t dps368_get_raw_pressure(spi_device_handle_t dev) {
 }
 
 
-float corrected_pressure(dps368_t *dev){
+double corrected_pressure(dps368_t *dev){
     //This function takes the raw_pressure value and utilizes the coefficients and kP value
     //to correct it per dps368 datasheet, kP for our sample rate is 253952, kT is the same
     
@@ -189,13 +189,13 @@ float corrected_pressure(dps368_t *dev){
     uint32_t kP = 253952;
     uint32_t kT = 253952;
     float T_raw_sc;
-    float P_raw_sc;
+    double P_raw_sc;
     T_raw_sc = (float)raw_t/(float)kT;
-    P_raw_sc = (float)raw_p/(float)kP;
+    P_raw_sc = (double)raw_p/(double)kP;
 
     //Pcomp(Pa) = c00 + Praw_sc*(c10 + Praw_sc *(c20+ Praw_sc *c30)) + Traw_sc *c01 +
     //Traw_sc *Praw_sc *(c11+Praw_sc*c21), from datasheet
-    float comp_pressure;
+    double comp_pressure;
     comp_pressure = coeffs[2] 
                     + P_raw_sc*(coeffs[3] + P_raw_sc *(coeffs[6] + P_raw_sc *coeffs[8]))
                     + T_raw_sc *coeffs[4] 
