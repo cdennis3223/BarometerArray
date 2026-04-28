@@ -6,6 +6,7 @@
 
 #define BUFFER_SIZE 256
 
+//this struct is for storing a single measurement
 typedef struct {
     uint32_t seq;
     double pressure;
@@ -24,10 +25,11 @@ typedef struct {
     bool valid_time;
 } sample_t;
 
+//this struct is a ring buffer of 256 measurements long, it is periodically read by the SD logging task
 typedef struct {
     sample_t buffer[BUFFER_SIZE];
-    volatile int head;
-    volatile int tail;
+    volatile int head; //write to head in the collate task
+    volatile int tail;  //read from tail in the logger task
 } ring_buffer_t;
 
 void ring_buffer_init(ring_buffer_t *rb);

@@ -44,7 +44,6 @@ void logger_task(void *args)
         {
             removal_pending = false;
             vTaskDelay(pdMS_TO_TICKS(200));   // insertion debounce
-
             if (card_inserted())
             {
                 // Make a new file for the first insertion, or for any confirmed reinsertion
@@ -70,7 +69,7 @@ void logger_task(void *args)
             removal_pending = true;
             removal_check_start_time = now_ms;
         }
-        // Confirmed removal
+        // Confirmed removal==============================================================
         else if (card_present && removal_pending &&
                  (now_ms - removal_check_start_time) >= removed_debounce_ms)
         {
@@ -82,17 +81,15 @@ void logger_task(void *args)
             sampling_enabled = false;
             printf("SD card removed\n");
         }
-
-        // Drain up to 5 samples each pass while card is present
+        // Logging samples from the ring buffer to the SD card happens here===========================
         if (card_present)
         {
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 5; i++) //Drain up to 5 samples each pass while card is present
             {
                 sample_t s;
                 if (!ring_buffer_pop(rb, &s)) {
                     break;
                 }
-
                 if (sd_log_sample(&s) == ESP_OK)
                 {
                     last_logged_seq = s.seq;
@@ -105,8 +102,7 @@ void logger_task(void *args)
                 }
             }
         }
-
-        // Shutdown handling
+        // Shutdown handling==============================================================
         if (shutdown_requested)
         {
             if (card_present) {
@@ -122,7 +118,6 @@ void logger_task(void *args)
             logger_done = true;
             vTaskDelete(NULL);
         }
-
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(100));  //logs at a frequency of 10 Hz (period of 100ms)
     }
 }

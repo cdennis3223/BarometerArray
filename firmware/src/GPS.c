@@ -41,12 +41,13 @@ void gps_get_display_data(gps_display_data_t *out)
     portEXIT_CRITICAL(&gps_data_lock);
 }
 
-static void IRAM_ATTR pps_isr_handler(void *arg)
+static void IRAM_ATTR pps_isr_handler(void *arg) //records the exact ESP32 timer value the moment the PPS signal edge goes high
 {
     g_pps.last_pps_local_us = esp_timer_get_time();
     g_pps.new_pps = true;
     g_pps.pps_count++;
 }
+
 static void gps_uart_init(void)
 {
     const uart_config_t uart_config = {
@@ -72,8 +73,8 @@ void pps_gpio_init(gpio_num_t pps_gpio)
         .intr_type = GPIO_INTR_POSEDGE};
     gpio_config(&io_conf);
 
-    gpio_install_isr_service(0);
-    gpio_isr_handler_add(pps_gpio, pps_isr_handler, NULL);
+    gpio_install_isr_service(0); //enables ESP32 GPIO interrupt system
+    gpio_isr_handler_add(pps_gpio, pps_isr_handler, NULL);  //connects PPS pin to interrupt_isr handler routine
 }
 
 void gps_time_update_from_pps(uint64_t utc_second_us, int64_t local_pps_us)
@@ -221,12 +222,10 @@ void gps_task(void *arg)
                         }
                     }
                 }
-                
                 idx = 0;
                 in_sentence = false;
                 continue;
             }
-
             if (idx < sizeof(line) - 1) {
                 line[idx++] = c;
             } else {
