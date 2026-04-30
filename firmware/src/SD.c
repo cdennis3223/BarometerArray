@@ -100,7 +100,7 @@ esp_err_t sd_log_sample(const sample_t *s)
                 (unsigned short)s->hour,
                 (unsigned short)s->minute,
                 (unsigned short)s->second,
-                (unsigned short)s->millisecond,
+                (unsigned int)s->millisecond,
                 //(unsigned long)s.seq,
                 (double)s->pressure,
                 (double)s->temperature,

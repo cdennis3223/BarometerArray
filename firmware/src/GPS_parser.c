@@ -232,6 +232,7 @@ static uint64_t date_time_to_epoch_seconds(int year, int month, int day,
            (uint64_t)minute * 60ULL + (uint64_t)second;
 }
 
+//converts rmc date and time string fields to time in microseconds as a uint64_t
 bool rmc_datetime_to_epoch_us(const char *date_str, const char *time_str, uint64_t *out_utc_us)
 {
     if (!date_str || !time_str || !out_utc_us) {
@@ -258,8 +259,36 @@ bool rmc_datetime_to_epoch_us(const char *date_str, const char *time_str, uint64
         return false;
     }
 
+    // Parse the sub-second fraction from the NMEA time field (e.g. "052928.250" → 250000 µs).
+    // Without this, a 4Hz GPS would reset the millisecond counter four times per second because
+    // all four anchors map to the same whole-second epoch.
+    uint32_t subsecond_us = 0;
+    const char *dot = strchr(time_str, '.');
+    if (dot) {
+        const char *p = dot + 1;
+
+        uint32_t frac   = 0;  // accumulates the fractional digits
+        int      digits = 0;  // how many digits we've read
+
+        while (*p >= '0' && *p <= '9' && digits < 6) {
+            frac = frac * 10 + (*p - '0');
+            digits++;
+            p++;
+        }
+
+        // Pad to 6 digits so the result is always in microseconds
+        // e.g. ".25"  → 25  → 250000 µs
+        //      ".250" → 250 → 250000 µs
+        while (digits < 6) {
+            frac *= 10;
+            digits++;
+        }
+
+        subsecond_us = frac + subsecond_us;
+    }
+
     uint64_t epoch_sec = date_time_to_epoch_seconds(year, month, day, hour, minute, second);
-    *out_utc_us = epoch_sec * 1000000ULL;
+    *out_utc_us = epoch_sec * 1000000ULL + subsecond_us;
     return true;
 }
 
