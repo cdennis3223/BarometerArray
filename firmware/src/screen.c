@@ -60,10 +60,10 @@ static void render_gps_screen(void)
         return;
     }
 
-    snprintf(line, sizeof(line), "LAT: %.4f", gps_data.latitude);
+    snprintf(line, sizeof(line), "LAT: %.6f", gps_data.latitude);
     sh1107_print_horizontal(10, 15, line);
 
-    snprintf(line, sizeof(line), "LON: %.4f", gps_data.longitude);
+    snprintf(line, sizeof(line), "LON: %.6f", gps_data.longitude);
     sh1107_print_horizontal(20, 15, line);
 
     format_utc_time(gps_data.utc_time, utc, sizeof(utc));
@@ -85,7 +85,7 @@ static void render_pressure_screen(ring_buffer_t *pressure_buffer)
         return;
     }
 
-    snprintf(line, sizeof(line), "%.2f hPa", latest_sample.pressure);
+    snprintf(line, sizeof(line), "%.2f Pa", latest_sample.pressure);
     sh1107_print_horizontal(10, 15, line);
 
     sh1107_print_horizontal(20, 15, "TEMPERATURE:");
@@ -99,10 +99,10 @@ static void render_battery_screen()
     float voltage = BatMGMT_readVoltage();
     float SoC = BatMGMT_readSOC();
     char line[24];
-    snprintf(line, sizeof(line), "VOLTAGE: %.4f", voltage);
+    snprintf(line, sizeof(line), "VOLTAGE: %.2f V", voltage);
     sh1107_print_horizontal(10, 15, line);
 
-    snprintf(line, sizeof(line), "SOC: %.4f", SoC);
+    snprintf(line, sizeof(line), "SOC: %.2f %%", SoC);
     sh1107_print_horizontal(20, 15, line);
 }
 

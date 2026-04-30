@@ -76,12 +76,14 @@ static void collate_task(void *arg)
     {
         sample_t s = {0}; //initializing measurement to save to ring buffer
 
+        /*
         if (!sampling_enabled) {
             s.seq = 0;
             vTaskDelay(pdMS_TO_TICKS(100));
             printf("Sampling paused, collate task waiting...\n");
             continue;
         }
+            */
         
         int64_t now_us = esp_timer_get_time();
 

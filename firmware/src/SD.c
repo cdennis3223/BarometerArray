@@ -83,7 +83,7 @@ esp_err_t sd_log_open(const char *name, const char *mode)
         ESP_LOGE("SD", "fopen failed %s (errno=%d: %s)", path, errno, strerror(errno));
         return ESP_FAIL;
     }
-    fprintf(g_f,"Year,Month,Day,Hour,Minute,Second,Millisecond,Pressure(hPa),Temperature(C),Time(ESP),Battery Voltage(V),Valid Time\n");
+    fprintf(g_f,"Year,Month,Day,Hour,Minute,Second,Millisecond,Pressure(Pa),Temperature(C),Time(ESP),Battery Voltage(V),SOC(%%),Valid Time \n");
     fflush(g_f);
 }
     return ESP_OK;
@@ -93,7 +93,7 @@ esp_err_t sd_log_sample(const sample_t *s)
 {
     if (!g_f) return ESP_ERR_INVALID_STATE;
 
-    int n = fprintf(g_f, "%04d,%02d,%02d,%02d,%02d,%02d,%03d,%.10f,%.2f,%llu,%.2f,%s\n",
+    int n = fprintf(g_f, "%04d,%02d,%02d,%02d,%02d,%02d,%03d,%.10f,%.2f,%llu,%.2f,%.2f,%s\n",
                 (unsigned short)s->year,
                 (unsigned short)s->month,
                 (unsigned short)s->day,
@@ -106,6 +106,7 @@ esp_err_t sd_log_sample(const sample_t *s)
                 (double)s->temperature,
                 (unsigned long long)s->esp_time_ms,
                 (float) s->Voltage,
+                (float) s->SOC,
                 (char) s->valid_time ? "true" : "false");
 
     if (n <= 0) {
