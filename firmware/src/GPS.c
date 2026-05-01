@@ -133,7 +133,7 @@ void gps_task(void *arg)
     char line[128];
     int idx = 0;
     bool in_sentence = false;
-    nmea_data_t data;
+    nmea_data_t nmea_data; //for storing the parsed GPS data from the NMEA sentences
 
     gps_uart_init();
 
@@ -141,55 +141,48 @@ void gps_task(void *arg)
     {
         int len = uart_read_bytes(GPS_UART, rx_buf, sizeof(rx_buf), pdMS_TO_TICKS(100));
 
-        if (len <= 0)
+        if (len <= 0)   //empty rx buffer
         {
             continue;
         }
 
-        for (int i = 0; i < len; i++)
+        for (int i = 0; i < len; i++) //parsing byte by byte thtrough NMEA sentence
         {
-            char c = (char)rx_buf[i];
-
-            if (c == '$')
+            char c = (char)rx_buf[i]; //cast uint8_t to char
+            if (c == '$') //start of new NMEA sentence
             {
                 idx = 0;
                 in_sentence = true;
                 line[idx++] = c;
                 continue;
             }
-
             if (!in_sentence)
             {
                 continue;
             }
-
-            if (c == '\n')
+            if (c == '\n') //end of NMEA sentence
             {
                 if (idx > 0 && line[idx - 1] == '\r')
                 {
                     idx--;
                 }
-
                 line[idx] = '\0';
-
-                memset(&data, 0, sizeof(data));
-
-                if (nmea_parse(line, &data))
+                memset(&nmea_data, 0, sizeof(nmea_data));
+                if (nmea_parse(line, &nmea_data)) //converts the NMEA sentence into structured data in the nmea_data_t struct
                 {
-                    if (data.rmc.valid)
+                    if (nmea_data.rmc.valid)
                     {
                         uint64_t parsed_utc_us = 0;
 
-                        if (rmc_datetime_to_epoch_us(data.rmc.date, data.rmc.time, &parsed_utc_us))
+                        if (rmc_datetime_to_epoch_us(nmea_data.rmc.date, nmea_data.rmc.time, &parsed_utc_us))
                         {
-
                             portENTER_CRITICAL(&gps_data_lock);
                             gps_display_data.valid = true;
-                            gps_display_data.latitude = data.rmc.lat;
-                            gps_display_data.longitude = data.rmc.lon;
+                            gps_display_data.latitude = nmea_data.rmc.lat;
+                            gps_display_data.longitude = nmea_data.rmc.lon;
 
                             strncpy(gps_display_data.utc_time,
-                                    data.rmc.time,
+                                    nmea_data.rmc.time,
                                     sizeof(gps_display_data.utc_time) - 1);
                             gps_display_data.utc_time[sizeof(gps_display_data.utc_time) - 1] = '\0';
                             portEXIT_CRITICAL(&gps_data_lock);
@@ -207,7 +200,7 @@ void gps_task(void *arg)
                                 gps_time_update_from_pps(pps_utc_us, local_pps_us);
 
                                 ESP_LOGI(TAG, "PPS sync established: %s %s",
-                                         data.rmc.date, data.rmc.time);
+                                         nmea_data.rmc.date, nmea_data.rmc.time);
                             }
                             else
                             {

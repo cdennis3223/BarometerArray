@@ -160,20 +160,19 @@ bool nmea_parse(char *sentence, nmea_data_t *data)
 {
     if (!sentence || !data)
         return false;
-
-    if (!nmea_validate_checksum(sentence))
+    if (!nmea_validate_checksum(sentence)) //checks that the NMEA sentence is not corrupted 
         return false;
 
     /* Work on a copy so we preserve the original if needed */
     char buf[NMEA_MAX_LEN];
-    strncpy(buf, sentence, sizeof(buf) - 1);
-    buf[sizeof(buf) - 1] = '\0';
+    strncpy(buf, sentence, sizeof(buf) - 1); //copies sentence to buf
+    buf[sizeof(buf) - 1] = '\0'; //null terminate
 
-    if (!nmea_strip_suffix(buf))
+    if (!nmea_strip_suffix(buf)) //remove the checksum and trailing \r\n
         return false;
 
     char *fields[NMEA_MAX_FIELDS] = {0};
-    int n = parse_comma_delimited_str(buf, fields, NMEA_MAX_FIELDS);
+    int n = parse_comma_delimited_str(buf, fields, NMEA_MAX_FIELDS); //breaks buf string into array of smaller strings called fields, returns number of fields found
 
     if (n < 1 || !fields[0])
         return false;
