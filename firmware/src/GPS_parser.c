@@ -198,7 +198,6 @@ bool nmea_parse(char *sentence, nmea_data_t *data)
 //Help cleanly convert RMC date/time to epoch microseconds for easier timestamp handling.
 // Note that this does not handle time zones or leap seconds, but should be sufficient for 
 //basic logging purposes.
-
 static bool is_leap_year(int year)
 {
     return ((year % 4 == 0) && (year % 100 != 0)) || (year % 400 == 0);
@@ -291,7 +290,3 @@ bool rmc_datetime_to_epoch_us(const char *date_str, const char *time_str, uint64
     *out_utc_us = epoch_sec * 1000000ULL + subsecond_us;
     return true;
 }
-
-/* -----------------------------------------------------------------------
- * Example usage
- * -------------------------------------------------------------------- */
