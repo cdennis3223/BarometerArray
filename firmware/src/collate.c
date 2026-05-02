@@ -85,7 +85,7 @@ static void collate_task(void *arg)
         }
             */
         
-        int64_t now_us = esp_timer_get_time();
+        
 
         //filling fields for sample struct before pushing to the ring buffer
         s.seq = sequence_start++;   //for numbering each sample in the CSV log
@@ -93,17 +93,20 @@ static void collate_task(void *arg)
         s.temperature = corrected_temperature(ctx->dev);
         s.Voltage = BatMGMT_readVoltage();
         s.SOC = BatMGMT_readSOC();
-        s.esp_time_ms = (uint64_t)(now_us / 1000ULL);
+
+        uint64_t now_us = (uint64_t)esp_timer_get_time();
+        s.esp_time_ms = now_us / 1000ULL;
 
 
         //This block handles the timestamping of samples
         bool gps_valid;
         uint64_t utc_sync_us; //actual time
-        int64_t local_sync_us; //timer from ESP32 clock
+        uint64_t local_sync_us; //timer from ESP32 clock
         if (gps_get_sync_snapshot(&gps_valid, &utc_sync_us, &local_sync_us) &&
-            gps_valid && now_us >= local_sync_us)
+            gps_valid &&
+            now_us >= local_sync_us)
         {
-            uint64_t utc_now_us = utc_sync_us + (uint64_t)(now_us - local_sync_us);
+            uint64_t utc_now_us = utc_sync_us + (now_us - local_sync_us);
             s.utc_time_ms = utc_now_us / 1000ULL;
             s.valid_time = true;
         }

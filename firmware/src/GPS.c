@@ -22,7 +22,7 @@ static portMUX_TYPE gps_data_lock = portMUX_INITIALIZER_UNLOCKED;
 
 typedef struct
 {
-    volatile int64_t last_pps_local_us;
+    volatile uint64_t last_pps_local_us;
     volatile bool new_pps;
     volatile uint32_t pps_count;
 } pps_state_t;
@@ -43,7 +43,7 @@ void gps_get_display_data(gps_display_data_t *out)
 
 static void IRAM_ATTR pps_isr_handler(void *arg) //records the exact ESP32 timer value the moment the PPS signal edge goes high
 {
-    g_pps.last_pps_local_us = esp_timer_get_time();
+    g_pps.last_pps_local_us = (uint64_t)esp_timer_get_time();
     g_pps.new_pps = true;
     g_pps.pps_count++;
 }
@@ -77,7 +77,7 @@ void pps_gpio_init(gpio_num_t pps_gpio)
     gpio_isr_handler_add(pps_gpio, pps_isr_handler, NULL);  //connects PPS pin to interrupt_isr handler routine
 }
 
-void gps_time_update_from_pps(uint64_t utc_second_us, int64_t local_pps_us)
+void gps_time_update_from_pps(uint64_t utc_second_us, uint64_t local_pps_us)
 {
     portENTER_CRITICAL(&gps_data_lock);
     gps_time.valid = true;
@@ -91,7 +91,7 @@ void gps_factory_reset(void)
     uart_write_bytes(GPS_UART, reset_cmd, strlen(reset_cmd));
 }
 
-bool gps_get_sync_snapshot(bool *valid, uint64_t *utc_sync_us, int64_t *local_sync_us)
+bool gps_get_sync_snapshot(bool *valid, uint64_t *utc_sync_us, uint64_t *local_sync_us)
 {
     if (!valid || !utc_sync_us || !local_sync_us) {
         return false;
@@ -133,6 +133,7 @@ void gps_task(void *arg)
     char line[128];
     int idx = 0;
     bool in_sentence = false;
+    uint64_t sentence_start_us = 0;
     nmea_data_t nmea_data; //for storing the parsed GPS data from the NMEA sentences
 
     gps_uart_init();
@@ -153,6 +154,7 @@ void gps_task(void *arg)
             {
                 idx = 0;
                 in_sentence = true;
+                sentence_start_us = (uint64_t)esp_timer_get_time();
                 line[idx++] = c;
                 continue;
             }
@@ -187,9 +189,9 @@ void gps_task(void *arg)
                             gps_display_data.utc_time[sizeof(gps_display_data.utc_time) - 1] = '\0';
                             portEXIT_CRITICAL(&gps_data_lock);
 
-                            if (g_pps.new_pps)
+                            if (g_pps.new_pps) //using PPS sychronization
                             {
-                                int64_t local_pps_us = g_pps.last_pps_local_us;
+                                uint64_t local_pps_us = g_pps.last_pps_local_us;
                                 g_pps.new_pps = false;
 
                                 // Start with this assumption.
@@ -199,15 +201,23 @@ void gps_task(void *arg)
 
                                 gps_time_update_from_pps(pps_utc_us, local_pps_us);
 
-                                ESP_LOGI(TAG, "PPS sync established: %s %s",
-                                         nmea_data.rmc.date, nmea_data.rmc.time);
+                                ESP_LOGI(TAG, "PPS sync established: %s %s",nmea_data.rmc.date, nmea_data.rmc.time);
                             }
-                            else
+                            else //fallback to NMEA syncronization
                             {
                                 portENTER_CRITICAL(&gps_data_lock);
+                                if (gps_time.valid) {
+                                    // Use GPS for the seconds field, but preserve the sub-second
+                                    // offset from the current interpolation to avoid backward jumps.
+                                    // The NMEA sentence always reports 0ms (integer seconds), but
+                                    // arrives hundreds of ms after the actual second boundary.
+                                    uint64_t sub_us = (gps_time.utc_sync_us + (sentence_start_us - gps_time.local_sync_us)) % 1000000ULL;
+                                    gps_time.utc_sync_us = (parsed_utc_us / 1000000ULL) * 1000000ULL + sub_us;
+                                } else {
+                                    gps_time.utc_sync_us = parsed_utc_us;
+                                }
                                 gps_time.valid = true;
-                                gps_time.utc_sync_us = parsed_utc_us;
-                                gps_time.local_sync_us = esp_timer_get_time();
+                                gps_time.local_sync_us = sentence_start_us;
                                 portEXIT_CRITICAL(&gps_data_lock);
 
                                 ESP_LOGW(TAG, "GPS time updated from NMEA only");

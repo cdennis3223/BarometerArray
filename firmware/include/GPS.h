@@ -14,7 +14,7 @@
 
 typedef struct {
     uint64_t utc_sync_us;      // UTC time at last GPS update
-    int64_t local_sync_us;     // esp_timer_get_time() at that moment
+    uint64_t local_sync_us;    // esp_timer_get_time() at that moment
     bool valid;
 } gps_time_sync_t;
 
@@ -29,7 +29,7 @@ typedef struct {
 extern gps_time_sync_t gps_time;
 extern gps_display_data_t gps_display_data;
 
-bool gps_get_sync_snapshot(bool *valid, uint64_t *utc_sync_us, int64_t *local_sync_us);
+bool gps_get_sync_snapshot(bool *valid, uint64_t *utc_sync_us, uint64_t *local_sync_us);
 
 bool utc_ms_to_parts(int64_t utc_ms, sample_t *out);
 
