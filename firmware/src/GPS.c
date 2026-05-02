@@ -23,7 +23,6 @@ static portMUX_TYPE gps_data_lock = portMUX_INITIALIZER_UNLOCKED;
 typedef struct
 {
     volatile uint64_t last_pps_local_us;
-    volatile bool new_pps;
     volatile uint32_t pps_count;
 } pps_state_t;
 
@@ -44,7 +43,6 @@ void gps_get_display_data(gps_display_data_t *out)
 static void IRAM_ATTR pps_isr_handler(void *arg) //records the exact ESP32 timer value the moment the PPS signal edge goes high
 {
     g_pps.last_pps_local_us = (uint64_t)esp_timer_get_time();
-    g_pps.new_pps = true;
     g_pps.pps_count++;
 }
 
@@ -81,14 +79,6 @@ void pps_gpio_init(gpio_num_t pps_gpio)
     gpio_isr_handler_add(pps_gpio, pps_isr_handler, NULL);  //connects PPS pin to interrupt_isr handler routine
 }
 
-void gps_time_update_from_pps(uint64_t utc_second_us, uint64_t local_pps_us)
-{
-    portENTER_CRITICAL(&gps_data_lock);
-    gps_time.valid = true;
-    gps_time.utc_sync_us = utc_second_us;
-    gps_time.local_sync_us = local_pps_us;
-    portEXIT_CRITICAL(&gps_data_lock);
-}
 void gps_factory_reset(void)
 {
     const char *reset_cmd = "$PMTK104*37\r\n";
@@ -138,6 +128,7 @@ void gps_task(void *arg)
     int idx = 0;
     bool in_sentence = false;
     uint64_t sentence_start_us = 0;
+    uint32_t last_pps_count = 0;
     nmea_data_t nmea_data; //for storing the parsed GPS data from the NMEA sentences
 
     gps_uart_init();
@@ -183,84 +174,63 @@ void gps_task(void *arg)
                         uint64_t parsed_utc_us = 0;
 
                         if (rmc_datetime_to_epoch_us(nmea_data.rmc.date, nmea_data.rmc.time, &parsed_utc_us))
-                        { 
-                            // Atomically snapshot and clear the PPS state
-                            portENTER_CRITICAL(&gps_data_lock);
-                            uint64_t last_pps_us = g_pps.last_pps_local_us;
-                            g_pps.new_pps = false;
-                            portEXIT_CRITICAL(&gps_data_lock);
-
-                            // PPS belongs to this second if it fired within 600ms before the sentence arrived.
-                            // This handles the case where NMEA is processed before the PPS flag is set.
-                            bool pps_recent = (sentence_start_us >= last_pps_us) &&
-                                            (sentence_start_us - last_pps_us < 900000ULL);
-
-                            if (pps_recent)
-                            {
-                                gps_time_update_from_pps(parsed_utc_us, last_pps_us);
-                                ESP_LOGI(TAG, "PPS sync established: %s %s", nmea_data.rmc.date, nmea_data.rmc.time);
-                            }
-                            else
-                            {
-                                portENTER_CRITICAL(&gps_data_lock);
-                                if (gps_time.valid) {
-                                    uint64_t sub_us = (gps_time.utc_sync_us + (sentence_start_us - gps_time.local_sync_us)) % 1000000ULL;
-                                    gps_time.utc_sync_us = (parsed_utc_us / 1000000ULL) * 1000000ULL + sub_us;
-                                } else {
-                                    gps_time.utc_sync_us = parsed_utc_us;
-                                }
-                                gps_time.valid = true;
-                                gps_time.local_sync_us = sentence_start_us;
-                                portEXIT_CRITICAL(&gps_data_lock);
-
-                                ESP_LOGW(TAG, "GPS time updated from NMEA only");
-                            }
-
-                            /*
+                        {
+                            // Update GPS display data for UI
                             portENTER_CRITICAL(&gps_data_lock);
                             gps_display_data.valid = true;
                             gps_display_data.latitude = nmea_data.rmc.lat;
                             gps_display_data.longitude = nmea_data.rmc.lon;
-
-                            strncpy(gps_display_data.utc_time,
-                                    nmea_data.rmc.time,
-                                    sizeof(gps_display_data.utc_time) - 1);
+                            strncpy(gps_display_data.utc_time, nmea_data.rmc.time, sizeof(gps_display_data.utc_time) - 1);
                             gps_display_data.utc_time[sizeof(gps_display_data.utc_time) - 1] = '\0';
                             portEXIT_CRITICAL(&gps_data_lock);
 
-                            if (g_pps.new_pps) //using PPS sychronization
-                            {
-                                portENTER_CRITICAL(&gps_data_lock);   // ← disable interrupts
-                                bool pps_fired = g_pps.new_pps;       // ← snapshot the flag
-                                uint64_t local_pps_us = g_pps.last_pps_local_us;  // ← snapshot the timestamp
-                                g_pps.new_pps = false;                // ← clear the flag
-                                portEXIT_CRITICAL(&gps_data_lock);    // ← re-enable interrupts
-                                if (pps_fired)                        // ← now check the snapshot, not the live variable
-                                {
-                                    uint64_t pps_utc_us = parsed_utc_us;
-                                    gps_time_update_from_pps(pps_utc_us, local_pps_us);
-                                    ESP_LOGI(TAG, "PPS sync established: %s %s", nmea_data.rmc.date, nmea_data.rmc.time);
-                                }
-                            }
-                            else //fallback to NMEA syncronization
-                            {
-                                portENTER_CRITICAL(&gps_data_lock);
-                                if (gps_time.valid) {
-                                    // Use GPS for the seconds field, but preserve the sub-second
-                                    // offset from the current interpolation to avoid backward jumps.
-                                    // The NMEA sentence always reports 0ms (integer seconds), but
-                                    // arrives hundreds of ms after the actual second boundary.
-                                    uint64_t sub_us = (gps_time.utc_sync_us + (sentence_start_us - gps_time.local_sync_us)) % 1000000ULL;
-                                    gps_time.utc_sync_us = (parsed_utc_us / 1000000ULL) * 1000000ULL + sub_us;
-                                } else {
-                                    gps_time.utc_sync_us = parsed_utc_us;
-                                }
-                                gps_time.valid = true;
-                                gps_time.local_sync_us = sentence_start_us;
-                                portEXIT_CRITICAL(&gps_data_lock);
+                            // Snapshot PPS state atomically
+                            uint64_t pps_local_us;
+                            uint32_t pps_count_now;
+                            portENTER_CRITICAL(&gps_data_lock);
+                            pps_local_us = g_pps.last_pps_local_us;
+                            pps_count_now = g_pps.pps_count;
+                            portEXIT_CRITICAL(&gps_data_lock);
 
-                                ESP_LOGW(TAG, "GPS time updated from NMEA only");
-                            } */
+                            // delta: time from PPS edge to the start of the matching NMEA sentence.
+                            // A clean pair means PPS and NMEA describe the same GPS second:
+                            //   - exactly one PPS fired since the previous NMEA (no missed/extra pulses)
+                            //   - delta is in the normal GxRMC-after-PPS range (~500-800ms typical)
+                            // Outside that, we do not update the anchor — dead-reckoning preserves
+                            // continuity until the next clean pair arrives.
+                            uint64_t delta = (sentence_start_us > pps_local_us)
+                                             ? sentence_start_us - pps_local_us
+                                             : 0;
+                            uint32_t pps_since_last = pps_count_now - last_pps_count;
+                            last_pps_count = pps_count_now;
+
+                            bool clean_pair = (pps_since_last == 1) &&
+                                              (delta > 300000ULL) &&
+                                              (delta < 900000ULL);
+
+                            if (clean_pair)
+                            {
+                                // PA1616: PPS edge marks the start of GPS second (NMEA seconds + 1).
+                                portENTER_CRITICAL(&gps_data_lock);
+                                gps_time.utc_sync_us = parsed_utc_us + 1000000ULL;
+                                gps_time.local_sync_us = pps_local_us;
+                                gps_time.valid = true;
+                                portEXIT_CRITICAL(&gps_data_lock);
+                                ESP_LOGI(TAG, "GPS sync: delta=%llu us, %s %s",
+                                         (unsigned long long)delta, nmea_data.rmc.date, nmea_data.rmc.time);
+                            }
+                            else if (!gps_time.valid)
+                            {
+                                // Cold start — no clean pair yet. Anchor on NMEA alone (~ms accuracy)
+                                // so timestamps are usable immediately; PPS will refine on next pair.
+                                portENTER_CRITICAL(&gps_data_lock);
+                                gps_time.utc_sync_us = parsed_utc_us;
+                                gps_time.local_sync_us = sentence_start_us;
+                                gps_time.valid = true;
+                                portEXIT_CRITICAL(&gps_data_lock);
+                                ESP_LOGW(TAG, "Cold-start NMEA-only sync (waiting for clean PPS pair)");
+                            }
+                            // else: dead-reckon from last clean PPS+NMEA anchor
                         }
                     }
                 }

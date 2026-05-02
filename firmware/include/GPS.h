@@ -26,9 +26,6 @@ typedef struct {
     bool valid;
 } gps_display_data_t;
 
-//needed by collate tasks in collate.c so I made it extern
-//extern gps_time_sync_t gps_time;
-//extern gps_display_data_t gps_display_data;
 
 bool gps_get_sync_snapshot(bool *valid, uint64_t *utc_sync_us, uint64_t *local_sync_us);
 

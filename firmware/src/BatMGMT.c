@@ -4,8 +4,15 @@
 #include <stdio.h>
 #include <string.h>
 
+#define MAX17043_VCELL_REG   0x02   // raw ADC voltage, MAX17043 datasheet Table 1
+#define MAX17043_SOC_REG     0x04   // state of charge, MAX17043 datasheet Table 1
+#define MAX17043_STATUS_REG  0x1A   // status register, MAX17043 datasheet Table 1
+#define MAX17043_RI_MASK     0xFE00 // clears RI flag, upper byte only
+#define MAX17043_VOLTAGE_LSB 78.125e-6f // 78.125µV per LSB, MAX17043 datasheet Table 1
+
 static i2c_master_bus_handle_t bus_handle;
 static i2c_master_dev_handle_t dev_handle;
+
 
 esp_err_t BatMGMT_init(void)
 {
@@ -71,8 +78,7 @@ static esp_err_t BatMGMT_write16(uint8_t reg, uint16_t value)
 void BatMGMT_clearRI(void)
 {
     uint16_t status = 0;
-
-    if (BatMGMT_read16(0x1A, &status) != ESP_OK) {
+    if (BatMGMT_read16(MAX17043_STATUS_REG, &status) != ESP_OK) {
         printf("BatMGMT: Failed to read STATUS before clearing RI\n");
         return;
     }
@@ -80,39 +86,33 @@ void BatMGMT_clearRI(void)
     printf("BatMGMT: STATUS before clear RI = 0x%04X\n", status);
 
     // Only clear RI in the upper byte. Do not trust or manipulate the low byte.
-    uint16_t new_status = status & 0xFE00;
+    uint16_t new_status = status & MAX17043_RI_MASK;
 
-    if (BatMGMT_write16(0x1A, new_status) != ESP_OK) {
+    if (BatMGMT_write16(MAX17043_STATUS_REG, new_status) != ESP_OK) {
         printf("BatMGMT: Failed to write STATUS to clear RI\n");
         return;
     }
-
-    if (BatMGMT_read16(0x1A, &status) != ESP_OK) {
+    if (BatMGMT_read16(MAX17043_STATUS_REG, &status) != ESP_OK) {
         printf("BatMGMT: Failed to verify STATUS after clearing RI\n");
         return;
     }
-
     printf("BatMGMT: STATUS after clear RI  = 0x%04X\n", status);
 }
 
 float BatMGMT_readSOC(void)
 {
     uint16_t raw_soc = 0;
-
-    if (BatMGMT_read16(0x04, &raw_soc) != ESP_OK) {
+    if (BatMGMT_read16(MAX17043_SOC_REG, &raw_soc) != ESP_OK) {
         return -1.0f;
     }
-
     return raw_soc / 256.0f;
 }
 
 float BatMGMT_readVoltage(void)
 {
     uint16_t raw_vcell = 0;
-
-    if (BatMGMT_read16(0x02, &raw_vcell) != ESP_OK) {
+    if (BatMGMT_read16(MAX17043_VCELL_REG, &raw_vcell) != ESP_OK) {
         return -1.0f;
     }
-
-    return raw_vcell * 78.125e-6f;
+    return raw_vcell * MAX17043_VOLTAGE_LSB;
 }

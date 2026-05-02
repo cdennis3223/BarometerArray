@@ -2,9 +2,7 @@
 
 #include <stdbool.h>
 
-/* -----------------------------------------------------------------------
- * Data structures
- * -------------------------------------------------------------------- */
+//These structs are for storing fields from parsed NMEA sentence in GPS task
 typedef struct {
     double lat;             /* decimal degrees, negative = South */
     double lon;             /* decimal degrees, negative = West  */
@@ -32,9 +30,7 @@ typedef struct {
 } nmea_data_t;
 
 
-
 bool rmc_datetime_to_epoch_us(const char *date_str, const char *time_str, uint64_t *out_utc_us);
-
 
 bool nmea_parse(char *sentence, nmea_data_t *data);
 

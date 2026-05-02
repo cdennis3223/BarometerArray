@@ -70,23 +70,9 @@ static void collate_task(void *arg)
 {
     collate_task_args_t *ctx = (collate_task_args_t *)arg; //casting args back to collate_task_args_t for later use
 
-    int64_t last_print_us = 0;
-
     while (!shutdown_requested) //shutdown happens when SD card is not present
     {
         sample_t s = {0}; //initializing measurement to save to ring buffer
-
-        /*
-        if (!sampling_enabled) {
-            s.seq = 0;
-            vTaskDelay(pdMS_TO_TICKS(100));
-            printf("Sampling paused, collate task waiting...\n");
-            continue;
-        }
-            */
-        
-        
-
         //filling fields for sample struct before pushing to the ring buffer
         s.seq = sequence_start++;   //for numbering each sample in the CSV log
         s.pressure = corrected_pressure(ctx->dev);
@@ -96,7 +82,6 @@ static void collate_task(void *arg)
 
         uint64_t now_us = (uint64_t)esp_timer_get_time();
         s.esp_time_ms = now_us / 1000ULL;
-
 
         //This block handles the timestamping of samples
         bool gps_valid;

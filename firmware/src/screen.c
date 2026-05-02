@@ -344,7 +344,7 @@ static void sh1107_print_horizontal(uint8_t col, uint8_t page, const char *str)
 
 //==UI Interface Task=================================================================================================
 // responds to botton task and cycles through readouts
-void button_task(void *arg)
+void userInterface_task(void *arg)
 {
     ring_buffer_t *pressure_buffer = (ring_buffer_t *)arg;
 
