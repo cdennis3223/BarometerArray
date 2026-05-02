@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "driver/uart.h"
+#include "driver/gpio.h"
 #include "collate.h"
 
 #define GPS_UART        UART_NUM_2
@@ -26,8 +27,8 @@ typedef struct {
 } gps_display_data_t;
 
 //needed by collate tasks in collate.c so I made it extern
-extern gps_time_sync_t gps_time;
-extern gps_display_data_t gps_display_data;
+//extern gps_time_sync_t gps_time;
+//extern gps_display_data_t gps_display_data;
 
 bool gps_get_sync_snapshot(bool *valid, uint64_t *utc_sync_us, uint64_t *local_sync_us);
 
@@ -39,3 +40,4 @@ void gps_task(void *arg);
 
 void gps_get_display_data(gps_display_data_t *out);
 
+void pps_gpio_init(gpio_num_t pps_gpio);
