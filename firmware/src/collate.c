@@ -14,6 +14,7 @@ typedef struct
 {
     ring_buffer_t *rb;
     dps368_t *dev;
+    dps368_t *dev2;
     uint32_t period_ms;
 } collate_task_args_t;
 
@@ -75,8 +76,10 @@ static void collate_task(void *arg)
         sample_t s = {0}; //initializing measurement to save to ring buffer
         //filling fields for sample struct before pushing to the ring buffer
         s.seq = sequence_start++;   //for numbering each sample in the CSV log
-        s.pressure = corrected_pressure(ctx->dev);
-        s.temperature = corrected_temperature(ctx->dev);
+        s.pressure_internal = corrected_pressure(ctx->dev);
+        s.temperature_internal = corrected_temperature(ctx->dev);
+        s.pressure_external = corrected_pressure(ctx->dev);
+        s.temperature_external = corrected_temperature(ctx->dev);
         s.Voltage = BatMGMT_readVoltage();
         s.SOC = BatMGMT_readSOC();
 
@@ -112,11 +115,12 @@ static void collate_task(void *arg)
     vTaskDelete(NULL); //ends the collate task, happens when the SD card is not present
 }
 
-void collate_start_task(ring_buffer_t *rb, dps368_t *dev, uint32_t period_ms)
+void collate_start_task(ring_buffer_t *rb, dps368_t *dev, dps368_t *dev2, uint32_t period_ms)
 {
     static collate_task_args_t args;
     args.rb = rb;
     args.dev = dev;
+    args.dev2 = dev2;
     args.period_ms = period_ms;
 
     xTaskCreate(collate_task, "collate_task", 4096, &args, 5, NULL);

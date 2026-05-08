@@ -20,6 +20,8 @@ esp_err_t spi_bus_init(spi_device_handle_t *handle_out);
 
 void dps368_init(dps368_t *dev, spi_device_handle_t spi_handle);
 
+esp_err_t spi_bus_init_two(spi_device_handle_t *handle1_out, spi_device_handle_t *handle2_out);
+
 double corrected_pressure(dps368_t *dev);
 
 float corrected_temperature(dps368_t *dev);

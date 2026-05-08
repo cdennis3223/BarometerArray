@@ -19,8 +19,10 @@
 #include "GlobalWatch.h"
 
 
-static spi_device_handle_t spi_handle;
-static dps368_t dps;
+static spi_device_handle_t spi1;
+static spi_device_handle_t spi2;
+static dps368_t dps_internal;
+static dps368_t dps_external;
 static ring_buffer_t pressure_buffer;
 volatile bool shutdown_requested = false;
 volatile bool logger_done = false;
@@ -39,17 +41,18 @@ void app_main(void)
     ring_buffer_init(&pressure_buffer);
 
     //Sets up the SPI bus before dsp368 configuration
-    if (spi_bus_init(&spi_handle) != ESP_OK) {
+    if (spi_bus_init_two(&spi1, &spi2) != ESP_OK) {
         printf("SPI init failed\n");
         return;
     }
-    dps368_init(&dps, spi_handle); //connects to DPS368 pressure sensor
+    dps368_init(&dps_internal, spi1); //connects to DPS368 pressure sensor internal
+    dps368_init(&dps_external, spi2); //connects to DPS368 pressure sensor external
 
     sd_log_open("log.csv", "w"); //opens csv file on the SD card to save measurements to
 
 
     // =====task creation==================================
-    collate_start_task(&pressure_buffer, &dps, 33); //this task starts the collate_task which handles taking measurements and saving to the ring buffer
+    collate_start_task(&pressure_buffer, &dps_internal, &dps_external, 33); //this task starts the collate_task which handles taking measurements and saving to the ring buffer
 
     xTaskCreate(logger_task, "logger_task", 4096, &pressure_buffer, 4, NULL); //this task takes measurements from the ring buffers, pops them off, and saves them to the SD card
 

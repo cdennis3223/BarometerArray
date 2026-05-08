@@ -5,8 +5,7 @@
 #include "esp_log.h"
 
 
-// spi_bus_init now takes a pointer (handle_out) to fill the variable in main
-esp_err_t spi_bus_init(spi_device_handle_t *handle_out) {
+static esp_err_t spi_bus_init_once(void) {
     spi_bus_config_t buscfg = {
         .miso_io_num = PIN_NUM_MISO,
         .mosi_io_num = PIN_NUM_MOSI,
@@ -15,18 +14,56 @@ esp_err_t spi_bus_init(spi_device_handle_t *handle_out) {
         .quadhd_io_num = -1,
         .max_transfer_sz = 4094,
     };
-    
-    esp_err_t ret = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
-    if (ret != ESP_OK) return ret;
 
-    spi_device_interface_config_t devcfg1 = {
+    esp_err_t ret = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
+
+    // ESP_ERR_INVALID_STATE means the SPI bus was already initialized.
+    // That is OK when adding another device to the same bus.
+    if (ret == ESP_ERR_INVALID_STATE) {
+        return ESP_OK;
+    }
+
+    return ret;
+}
+
+static esp_err_t spi_add_dps368_device(int cs_pin, spi_device_handle_t *handle_out) {
+    if (handle_out == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    spi_device_interface_config_t devcfg = {
         .clock_speed_hz = 1 * 1000 * 1000,
         .mode = 3,  // DPS368 standard
-        .spics_io_num = PIN_NUM_CS1,
+        .spics_io_num = cs_pin,
         .queue_size = 1,
     };
 
-    return spi_bus_add_device(SPI2_HOST, &devcfg1, handle_out);
+    return spi_bus_add_device(SPI2_HOST, &devcfg, handle_out);
+}
+
+// Single-device initializer. Kept for compatibility with existing code.
+esp_err_t spi_bus_init(spi_device_handle_t *handle_out) {
+    esp_err_t ret = spi_bus_init_once();
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    return spi_add_dps368_device(PIN_NUM_CS1, handle_out);
+}
+
+// Two-device initializer. Both devices share MISO/MOSI/SCLK, but use separate CS pins.
+esp_err_t spi_bus_init_two(spi_device_handle_t *handle1_out, spi_device_handle_t *handle2_out) {
+    esp_err_t ret = spi_bus_init_once();
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    ret = spi_add_dps368_device(PIN_NUM_CS1, handle1_out);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    return spi_add_dps368_device(PIN_NUM_CS2, handle2_out);
 }
 
 
@@ -121,8 +158,13 @@ void dps368_init(dps368_t *dev, spi_device_handle_t spi_handle) {
 
     //check the temp sensor source, bit 7 of COEF_STCE(0x28)
     //necessary to check temp sensor source for coefficient correction
-    uint8_t temp_source;
-    temp_source = dps368_read(dev->spi, 0x28, &temp_source, 1) & 0x80;
+    uint8_t temp_source = 0;
+    esp_err_t ret = dps368_read(dev->spi, 0x28, &temp_source, 1);
+    if (ret != ESP_OK) {
+        ESP_LOGE("DPS368", "Failed to read temperature source register: %s", esp_err_to_name(ret));
+        return;
+    }
+    temp_source &= 0x80;
 
     //Configure pressure register PRS_CFG(0x06)
     //bits 4-6   set pressure measurement rate.         Currently set to 0b0101 or 0x5, measurement rate of 32Hz

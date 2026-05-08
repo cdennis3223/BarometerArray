@@ -9,8 +9,10 @@
 //this struct is for storing a single measurement
 typedef struct {
     uint32_t seq;
-    double pressure;
-    float temperature;
+    double pressure_internal;
+    double pressure_external;
+    float temperature_internal;
+    float temperature_external;
     float Voltage;
     float SOC;
     uint64_t esp_time_ms;
@@ -38,4 +40,4 @@ bool ring_buffer_pop(ring_buffer_t *rb, sample_t *s);
 bool ring_buffer_peek_latest(ring_buffer_t *rb, sample_t *s);
 
 /* Starts a task that continuously samples the DPS368 and pushes into the buffer */
-void collate_start_task(ring_buffer_t *rb, dps368_t *dev, uint32_t period_ms);
+void collate_start_task(ring_buffer_t *rb, dps368_t *dev, dps368_t *dev2, uint32_t period_ms);
