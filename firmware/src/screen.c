@@ -77,7 +77,7 @@ static void render_pressure_screen(ring_buffer_t *pressure_buffer)
     char line[24];
 
     sh1107_clear();
-    sh1107_print_horizontal(0, 15, "PRESSURE:");
+    sh1107_print_horizontal(0, 15, "PRESSURE INTERNAL:");
 
     if (!ring_buffer_peek_latest(pressure_buffer, &latest_sample))
     {
@@ -85,12 +85,20 @@ static void render_pressure_screen(ring_buffer_t *pressure_buffer)
         return;
     }
 
-    snprintf(line, sizeof(line), "%.2f Pa", latest_sample.pressure);
+    snprintf(line, sizeof(line), "%.2f Pa", latest_sample.pressure_internal);
     sh1107_print_horizontal(10, 15, line);
 
-    sh1107_print_horizontal(20, 15, "TEMPERATURE:");
-    snprintf(line, sizeof(line), "%.2f C", latest_sample.temperature);
+    sh1107_print_horizontal(0, 30, "PRESSURE EXTERNAL:");
+    snprintf(line, sizeof(line), "%.2f Pa", latest_sample.pressure_external);
+    sh1107_print_horizontal(10, 30, line);
+
+    sh1107_print_horizontal(20, 15, "TEMPERATURE INTERNAL:");
+    snprintf(line, sizeof(line), "%.2f C", latest_sample.temperature_internal);
     sh1107_print_horizontal(30, 15, line);
+
+    sh1107_print_horizontal(20, 30, "TEMPERATURE EXTERNAL:");
+    snprintf(line, sizeof(line), "%.2f C", latest_sample.temperature_external);
+    sh1107_print_horizontal(30, 30, line);
 }
 
 static void render_battery_screen()
